@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import type {
   Faction,
@@ -8,7 +8,6 @@ import type {
   SimulationResults,
   ShipType,
 } from '../types/game';
-import { runSimulations } from '../engine/combatEngine';
 import { ResultsChart } from '../components/ResultsChart';
 import { SimulationLog } from '../components/SimulationLog';
 
@@ -49,34 +48,68 @@ export function ResultsPage() {
   const [setup] = useState<BattleSetupData | null>(() => readSetupFromStorage());
   const [results, setResults] = useState<SimulationResults | null>(null);
   const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [sortCol, setSortCol] = useState<'wins' | 'winPct' | 'damage'>('wins');
   const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
+  const workerRef = useRef<Worker | null>(null);
 
   const runSim = useCallback(() => {
     if (!setup) return;
     setResults(null);
     setRunning(true);
+    setProgress(0);
 
-    // Defer simulation to allow loading UI to render first
-    setTimeout(() => {
-      const factionsRecord: Record<string, Faction> = {};
-      for (const f of setup.factions) factionsRecord[f.id] = f;
+    // Terminate any existing worker
+    workerRef.current?.terminate();
 
-      const sectorSetup = {
+    const worker = new Worker(
+      new URL('../engine/simulationWorker.ts', import.meta.url),
+      { type: 'module' },
+    );
+    workerRef.current = worker;
+
+    worker.onmessage = (e) => {
+      if (e.data.type === 'progress') {
+        setProgress(Math.round((e.data.completed / e.data.total) * 100));
+      } else if (e.data.type === 'complete') {
+        setResults(e.data.results);
+        setRunning(false);
+        setProgress(100);
+        worker.terminate();
+        workerRef.current = null;
+      }
+    };
+
+    worker.onerror = () => {
+      setRunning(false);
+      worker.terminate();
+      workerRef.current = null;
+    };
+
+    const factionsRecord: Record<string, Faction> = {};
+    for (const f of setup.factions) factionsRecord[f.id] = f;
+
+    worker.postMessage({
+      setup: {
         factions: setup.factionDeployments,
         npcs: setup.npcDeployments,
-      };
-
-      const result = runSimulations(sectorSetup, factionsRecord, setup.config);
-      setResults(result);
-      setRunning(false);
-    }, 0);
+      },
+      factions: factionsRecord,
+      config: setup.config,
+    });
   }, [setup]);
 
   // Run on mount
   useEffect(() => {
     if (setup) runSim();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Clean up worker on unmount
+  useEffect(() => {
+    return () => {
+      workerRef.current?.terminate();
+    };
   }, []);
 
   const handleSort = (col: 'wins' | 'winPct' | 'damage') => {
@@ -88,7 +121,8 @@ export function ResultsPage() {
     }
   };
 
-  const totalRuns = results?.runs.length ?? 0;
+  // Use config.runs for accurate totals (runs array may be limited for memory)
+  const totalRuns = results?.config.runs ?? 0;
   const allFactions: Faction[] = setup?.factions ?? [];
 
   // Build display rows including NPCs
@@ -110,7 +144,9 @@ export function ResultsPage() {
     return { id, wins, winPct, avgDmg, avgSurvivors };
   });
 
-  const drawCount = results ? results.runs.filter(r => r.winnerId === null).length : 0;
+  // Compute draws from summary (accurate even with limited runs array)
+  const totalWins = results ? results.summary.reduce((sum, s) => sum + s.wins, 0) : 0;
+  const drawCount = totalRuns - totalWins;
 
   const sortedRows = [...tableRows].sort((a, b) => {
     const sign = sortDir === 'desc' ? -1 : 1;
@@ -128,7 +164,7 @@ export function ResultsPage() {
   }) => (
     <th
       onClick={() => handleSort(col)}
-      className="px-4 py-2 text-left text-xs font-semibold text-gray-400 uppercase cursor-pointer select-none hover:text-white transition-colors"
+      className="px-3 sm:px-4 py-2 text-left text-xs font-semibold text-gray-400 uppercase cursor-pointer select-none hover:text-white transition-colors"
     >
       {label}
       {sortCol === col && (
@@ -138,13 +174,13 @@ export function ResultsPage() {
   );
 
   return (
-    <div className="max-w-3xl mx-auto p-4 space-y-6">
+    <div className="max-w-3xl mx-auto p-3 sm:p-4 space-y-4 sm:space-y-6">
         {/* Page title */}
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold">
-            Simulation Results
+          <h2 className="text-xl sm:text-2xl font-bold">
+            Results
             {results && (
-              <span className="ml-2 text-lg font-normal text-gray-400">
+              <span className="ml-2 text-sm sm:text-lg font-normal text-gray-400">
                 ({totalRuns} runs)
               </span>
             )}
@@ -167,12 +203,20 @@ export function ResultsPage() {
           </div>
         )}
 
-        {/* Loading indicator */}
+        {/* Loading indicator with progress bar */}
         {running && (
           <div className="bg-gray-800 border border-gray-700 rounded-xl p-6 flex flex-col items-center gap-3">
-            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
+              <div
+                className="bg-blue-500 h-3 rounded-full transition-all duration-200"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
             <p className="text-gray-300 text-sm">
-              Running simulation ({setup?.config.runs ?? 0} runs)…
+              Simulating… {progress}%
+              <span className="text-gray-500 ml-1">
+                ({setup?.config.runs ?? 0} runs)
+              </span>
             </p>
           </div>
         )}
@@ -193,18 +237,18 @@ export function ResultsPage() {
                 {/* Statistics table */}
                 <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
                   <div className="px-4 py-3 border-b border-gray-700">
-                    <h3 className="text-lg font-semibold text-white">Per-Faction Statistics</h3>
+                    <h3 className="text-base sm:text-lg font-semibold text-white">Per-Faction Statistics</h3>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-gray-700/50">
                         <tr>
-                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-400 uppercase">
+                          <th className="px-3 sm:px-4 py-2 text-left text-xs font-semibold text-gray-400 uppercase">
                             Faction
                           </th>
                           <SortHeader col="wins" label="Wins" />
                           <SortHeader col="winPct" label="Win %" />
-                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-400 uppercase">
+                          <th className="px-3 sm:px-4 py-2 text-left text-xs font-semibold text-gray-400 uppercase">
                             Avg Survivors
                           </th>
                           <SortHeader col="damage" label="Avg Dmg" />
@@ -222,17 +266,17 @@ export function ResultsPage() {
                               key={row.id}
                               className={i % 2 === 0 ? 'bg-gray-800' : 'bg-gray-750'}
                             >
-                              <td className="px-4 py-2.5 text-white font-medium">
+                              <td className="px-3 sm:px-4 py-2.5 text-white font-medium">
                                 {getFactionDisplayName(row.id, allFactions)}
                               </td>
-                              <td className="px-4 py-2.5 text-gray-300">{row.wins}</td>
-                              <td className="px-4 py-2.5 text-gray-300">
+                              <td className="px-3 sm:px-4 py-2.5 text-gray-300">{row.wins}</td>
+                              <td className="px-3 sm:px-4 py-2.5 text-gray-300">
                                 {row.winPct.toFixed(1)}%
                               </td>
-                              <td className="px-4 py-2.5 text-gray-300 text-xs">
+                              <td className="px-3 sm:px-4 py-2.5 text-gray-300 text-xs">
                                 {survivorParts.length > 0 ? survivorParts.join(', ') : '—'}
                               </td>
-                              <td className="px-4 py-2.5 text-gray-300">
+                              <td className="px-3 sm:px-4 py-2.5 text-gray-300">
                                 {row.avgDmg.toFixed(1)}
                               </td>
                             </tr>
@@ -240,13 +284,13 @@ export function ResultsPage() {
                         })}
                         {/* Draw row */}
                         <tr className={sortedRows.length % 2 === 0 ? 'bg-gray-800' : 'bg-gray-750'}>
-                          <td className="px-4 py-2.5 text-yellow-400 font-medium">Draw</td>
-                          <td className="px-4 py-2.5 text-gray-300">{drawCount}</td>
-                          <td className="px-4 py-2.5 text-gray-300">
+                          <td className="px-3 sm:px-4 py-2.5 text-yellow-400 font-medium">Draw</td>
+                          <td className="px-3 sm:px-4 py-2.5 text-gray-300">{drawCount}</td>
+                          <td className="px-3 sm:px-4 py-2.5 text-gray-300">
                             {totalRuns > 0 ? ((drawCount / totalRuns) * 100).toFixed(1) : '0.0'}%
                           </td>
-                          <td className="px-4 py-2.5 text-gray-500">—</td>
-                          <td className="px-4 py-2.5 text-gray-500">—</td>
+                          <td className="px-3 sm:px-4 py-2.5 text-gray-500">—</td>
+                          <td className="px-3 sm:px-4 py-2.5 text-gray-500">—</td>
                         </tr>
                       </tbody>
                     </table>
@@ -268,13 +312,13 @@ export function ResultsPage() {
               disabled={running}
               className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors text-sm"
             >
-              ↻ Re-run Simulation
+              Re-run
             </button>
             <Link
               to="/battle"
               className="px-5 py-2.5 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-xl transition-colors text-sm"
             >
-              ← Modify Setup
+              Modify Setup
             </Link>
           </div>
         )}

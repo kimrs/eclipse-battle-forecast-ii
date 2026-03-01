@@ -44,7 +44,13 @@ function drawChart(
   containerWidth: number,
   chartData: ChartEntry[],
 ) {
-  const margin = { top: 12, right: 72, bottom: 12, left: 120 };
+  const compact = containerWidth < 400;
+  const margin = {
+    top: 12,
+    right: compact ? 52 : 72,
+    bottom: 12,
+    left: compact ? 72 : 120,
+  };
   const barHeight = 32;
   const barGap = 10;
   const height = chartData.length * (barHeight + barGap) + margin.top + margin.bottom;
@@ -70,8 +76,8 @@ function drawChart(
       .attr('dy', '0.35em')
       .attr('text-anchor', 'end')
       .attr('fill', '#d1d5db')
-      .attr('font-size', '13')
-      .text(d.label);
+      .attr('font-size', compact ? '11' : '13')
+      .text(compact && d.label.length > 8 ? d.label.slice(0, 7) + '…' : d.label);
 
     // Background track
     g.append('rect')
@@ -100,7 +106,7 @@ function drawChart(
       .attr('y', y + barHeight / 2)
       .attr('dy', '0.35em')
       .attr('fill', '#f9fafb')
-      .attr('font-size', '13')
+      .attr('font-size', compact ? '11' : '13')
       .text(`${(d.pct * 100).toFixed(1)}%`);
 
     // Hover tooltip overlay

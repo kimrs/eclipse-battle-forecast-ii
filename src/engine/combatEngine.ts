@@ -52,6 +52,7 @@ function buildDieResults(
   firingShips: BattleShip[],
   diceEngine: DiceEngine,
   getMissiles: boolean,
+  hasAntimatterSplitter: boolean,
 ): BuildDieOutput {
   if (firingShips.length === 0) return { results: [], diceDetail: [] };
   const computers = computeBlueprintStats(firingShips[0].blueprint).computers;
@@ -70,7 +71,7 @@ function buildDieResults(
             faceValue: face.value,
             damage: face.damage,
             selfDamage: face.selfDamage ?? 0,
-            isAntimatter: !!part.isAntimatter,
+            isAntimatter: !!part.isAntimatter && hasAntimatterSplitter,
             isRift,
             attackerComputers: computers,
           });
@@ -127,8 +128,8 @@ export interface BattlePairResult {
 }
 
 export function resolveBattlePair(
-  attacker: { factionId: string; ships: BattleShip[] },
-  defender: { factionId: string; ships: BattleShip[] },
+  attacker: { factionId: string; ships: BattleShip[]; hasAntimatterSplitter?: boolean },
+  defender: { factionId: string; ships: BattleShip[]; hasAntimatterSplitter?: boolean },
   diceEngine: DiceEngine,
   isNpcDefender: boolean,
   trackEvents = false,
@@ -137,6 +138,10 @@ export function resolveBattlePair(
   let dShips: BattleShip[] = defender.ships.map(s => ({ ...s }));
   const aId = attacker.factionId;
   const dId = defender.factionId;
+  const splitterByFaction: Record<string, boolean> = {
+    [aId]: !!attacker.hasAntimatterSplitter,
+    [dId]: !!defender.hasAntimatterSplitter,
+  };
 
   function getOrder() {
     const aTypes = [...new Set(aShips.map(s => s.blueprint.shipType))];
@@ -163,7 +168,7 @@ export function resolveBattlePair(
   ): { my: BattleShip[]; enemy: BattleShip[] } {
     const group = myShips.filter(s => s.blueprint.shipType === shipType);
     if (group.length === 0 || enemyShips.length === 0) return { my: myShips, enemy: enemyShips };
-    const { results: dieResults, diceDetail } = buildDieResults(group, diceEngine, getMissiles);
+    const { results: dieResults, diceDetail } = buildDieResults(group, diceEngine, getMissiles, splitterByFaction[firingFactionId] ?? false);
     if (dieResults.length === 0) return { my: myShips, enemy: enemyShips };
     const isNpcFiring = isNpcDefender && firingFactionId === dId;
     const ownRiftShips = group.filter(s => s.hasRiftWeapon);
@@ -264,6 +269,7 @@ export function simulateSectorBattle(
 ): SectorBattleResult {
   // Build battle ships for player factions
   const shipMap = new Map<string, BattleShip[]>();
+  const splitterMap = new Map<string, boolean>();
   for (const dep of setup.factions) {
     const faction = factions[dep.factionId];
     const ships: BattleShip[] = [];
@@ -271,6 +277,7 @@ export function simulateSectorBattle(
       ships.push(...createBattleShips(dep.factionId, faction.blueprints[type], count, `${dep.factionId}-${type}`));
     }
     shipMap.set(dep.factionId, ships);
+    splitterMap.set(dep.factionId, !!faction.hasAntimatterSplitter);
   }
 
   // Build battle ships for NPCs (synthetic IDs)
@@ -310,14 +317,16 @@ export function simulateSectorBattle(
   let currentId = battleQueue[0].factionId;
   let currentIsNpc = battleQueue[0].isNpc;
   let currentShips = shipMap.get(currentId)!;
+  let currentSplitter = splitterMap.get(currentId) ?? false;
 
   for (let i = 1; i < battleQueue.length; i++) {
     const next = battleQueue[i];
     const nextShips = shipMap.get(next.factionId)!;
+    const nextSplitter = splitterMap.get(next.factionId) ?? false;
 
     const result = resolveBattlePair(
-      { factionId: currentId, ships: currentShips },
-      { factionId: next.factionId, ships: nextShips },
+      { factionId: currentId, ships: currentShips, hasAntimatterSplitter: currentSplitter },
+      { factionId: next.factionId, ships: nextShips, hasAntimatterSplitter: nextSplitter },
       diceEngine,
       next.isNpc,
       trackEvents,
@@ -331,6 +340,7 @@ export function simulateSectorBattle(
 
     currentId = result.winnerId;
     currentIsNpc = result.winnerId === next.factionId ? next.isNpc : currentIsNpc;
+    currentSplitter = result.winnerId === next.factionId ? nextSplitter : currentSplitter;
     currentShips = result.survivors;
   }
 

@@ -102,6 +102,7 @@ export const SHIP_PARTS: ShipPart[] = [
     initiative: 0,
     energyProduction: 0,
     energyConsumption: 3,
+    isAntimatter: true,
   },
 
   // --- Defense ---
@@ -267,19 +268,6 @@ export const SHIP_PARTS: ShipPart[] = [
   },
 
   // --- Special ---
-  {
-    id: 'antimatter-splitter',
-    name: 'Antimatter Splitter',
-    cannons: [],
-    missiles: [],
-    computers: 0,
-    shields: 0,
-    hull: 0,
-    initiative: 0,
-    energyProduction: 0,
-    energyConsumption: 0,
-    isAntimatter: true,
-  },
   {
     id: 'rift-conductor',
     name: 'Rift Conductor',

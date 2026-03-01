@@ -88,6 +88,7 @@ export interface Faction {
   id: string;
   name: string;
   blueprints: Record<ShipType, Blueprint>;
+  hasAntimatterSplitter?: boolean;
 }
 
 // Battle Setup Types

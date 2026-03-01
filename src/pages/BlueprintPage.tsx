@@ -253,6 +253,22 @@ export function BlueprintPage() {
             </div>
           </div>
 
+          {/* Technologies */}
+          <div className="mt-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={!!activeFaction.hasAntimatterSplitter}
+                onChange={e =>
+                  updateFaction({ ...activeFaction, hasAntimatterSplitter: e.target.checked })
+                }
+                className="w-4 h-4 accent-blue-500"
+              />
+              <span className="text-sm text-gray-300">Antimatter Splitter</span>
+              <span className="text-xs text-gray-500">(splits antimatter damage freely across targets)</span>
+            </label>
+          </div>
+
           {/* Ship Type Tabs */}
           <div className="flex gap-1 mt-4 border-b border-gray-700 pb-0">
             {SHIP_TYPES.map(type => (

@@ -11,7 +11,7 @@ interface ShipPartSelectorProps {
 const CATEGORIES = ['Weapons', 'Defense', 'Propulsion', 'Energy', 'Special'] as const;
 
 function getCategory(part: ShipPart): string {
-  if (part.isRiftWeapon || (part.isAntimatter && part.cannons.length === 0 && part.missiles.length === 0)) {
+  if (part.isRiftWeapon) {
     return 'Special';
   }
   if (part.cannons.length > 0 || part.missiles.length > 0) {

@@ -1,72 +1,59 @@
-# Claude Code
+# Eclipse Combat Forecast II
 
-![](https://img.shields.io/badge/Node.js-18%2B-brightgreen?style=flat-square) [![npm]](https://www.npmjs.com/package/@anthropic-ai/claude-code)
+A Monte Carlo combat simulator for the board game [Eclipse](https://boardgamegeek.com/boardgame/246900/eclipse-second-dawn-galaxy). Design ship blueprints, configure battle scenarios, and run thousands of simulations to forecast win probabilities and survival statistics.
 
-[npm]: https://img.shields.io/npm/v/@anthropic-ai/claude-code.svg?style=flat-square
+## Features
 
-Claude Code is an agentic coding tool that lives in your terminal, understands your codebase, and helps you code faster by executing routine tasks, explaining complex code, and handling git workflows -- all through natural language commands. Use it in your terminal, IDE, or tag @claude on Github.
+- **Blueprint Designer** — Equip interceptors, cruisers, dreadnoughts, and starbases with weapons, shields, drives, and reactors. Load presets for 7 Eclipse species or build from scratch.
+- **Battle Setup** — Deploy multiple factions and NPCs (Ancients, Guardians, GCDS), set turn order, and configure simulation parameters.
+- **Combat Engine** — Faithful implementation of Eclipse combat rules: missile phases, engagement rounds, initiative ordering, shield thresholds, antimatter splitting, and Rift weapon backfire.
+- **Monte Carlo Results** — Run 100–1,000+ simulations and view win rates, draw probabilities, and average survivors per ship type, visualized with D3.js charts.
 
-**Learn more in the [official documentation](https://code.claude.com/docs/en/overview)**.
+## Tech Stack
 
-<img src="./demo.gif" />
+React 18 | TypeScript | Vite | Tailwind CSS | D3.js | Vitest
 
-## Get started
-> [!NOTE]
-> Installation via npm is deprecated. Use one of the recommended methods below.
+## Getting Started
 
-For more installation options, uninstall steps, and troubleshooting, see the [setup documentation](https://code.claude.com/docs/en/setup).
+```bash
+npm install
+npm run dev
+```
 
-1. Install Claude Code:
+Open the local URL printed by Vite (default `http://localhost:5173`).
 
-    **MacOS/Linux (Recommended):**
-    ```bash
-    curl -fsSL https://claude.ai/install.sh | bash
-    ```
+## Scripts
 
-    **Homebrew (MacOS/Linux):**
-    ```bash
-    brew install --cask claude-code
-    ```
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start dev server with hot reload |
+| `npm run build` | Type-check and build for production |
+| `npm run preview` | Preview the production build |
+| `npm run lint` | Run ESLint |
+| `npm test` | Run test suite |
 
-    **Windows (Recommended):**
-    ```powershell
-    irm https://claude.ai/install.ps1 | iex
-    ```
+## Project Structure
 
-    **WinGet (Windows):**
-    ```powershell
-    winget install Anthropic.ClaudeCode
-    ```
+```
+src/
+  types/          # Core TypeScript interfaces
+  data/           # Dice, ship parts, species presets, NPC blueprints
+  engine/         # Combat simulation: dice pool, initiative, hit assignment, combat resolution
+    __tests__/    # Unit and integration tests
+  components/     # React components: blueprint editor, battle setup, results chart
+  pages/          # Three-page SPA: Blueprints → Battle → Results
+  hooks/          # useLocalStorage
+  utils/          # Result aggregation and statistics
+specs/            # Design specification documents
+```
 
-    **NPM (Deprecated):**
-    ```bash
-    npm install -g @anthropic-ai/claude-code
-    ```
+## How It Works
 
-2. Navigate to your project directory and run `claude`.
+1. **Design** your fleet blueprints on the Blueprints page, choosing parts for each ship type.
+2. **Configure** a battle on the Battle page — pick factions, set ship counts, add NPCs.
+3. **Simulate** — the engine runs N independent battles using a fair dice pool (Fisher-Yates shuffle, uniform distribution). Each battle resolves missile fire, then alternating cannon rounds by initiative until one side is eliminated.
+4. **Review** results — win percentages, average survivors, and detailed per-run logs.
 
-## Plugins
+## License
 
-This repository includes several Claude Code plugins that extend functionality with custom commands and agents. See the [plugins directory](./plugins/README.md) for detailed documentation on available plugins.
-
-## Reporting Bugs
-
-We welcome your feedback. Use the `/bug` command to report issues directly within Claude Code, or file a [GitHub issue](https://github.com/anthropics/claude-code/issues).
-
-## Connect on Discord
-
-Join the [Claude Developers Discord](https://anthropic.com/discord) to connect with other developers using Claude Code. Get help, share feedback, and discuss your projects with the community.
-
-## Data collection, usage, and retention
-
-When you use Claude Code, we collect feedback, which includes usage data (such as code acceptance or rejections), associated conversation data, and user feedback submitted via the `/bug` command.
-
-### How we use your data
-
-See our [data usage policies](https://code.claude.com/docs/en/data-usage).
-
-### Privacy safeguards
-
-We have implemented several safeguards to protect your data, including limited retention periods for sensitive information, restricted access to user session data, and clear policies against using feedback for model training.
-
-For full details, please review our [Commercial Terms of Service](https://www.anthropic.com/legal/commercial-terms) and [Privacy Policy](https://www.anthropic.com/legal/privacy).
+MIT

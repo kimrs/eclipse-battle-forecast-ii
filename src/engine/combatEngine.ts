@@ -1,6 +1,9 @@
 import type {
+  BattleEvent,
   BattleShip,
   Blueprint,
+  DieColor,
+  DieValue,
   Faction,
   FactionResult,
   SectorSetup,
@@ -40,14 +43,20 @@ function createBattleShips(
 
 // ── Dice Helpers ──────────────────────────────────────────────────────────
 
+interface BuildDieOutput {
+  results: PendingDieResult[];
+  diceDetail: { color: DieColor; value: DieValue }[];
+}
+
 function buildDieResults(
   firingShips: BattleShip[],
   diceEngine: DiceEngine,
   getMissiles: boolean,
-): PendingDieResult[] {
-  if (firingShips.length === 0) return [];
+): BuildDieOutput {
+  if (firingShips.length === 0) return { results: [], diceDetail: [] };
   const computers = computeBlueprintStats(firingShips[0].blueprint).computers;
   const results: PendingDieResult[] = [];
+  const diceDetail: { color: DieColor; value: DieValue }[] = [];
   for (const ship of firingShips) {
     for (const part of ship.blueprint.parts) {
       const symbols = getMissiles ? part.missiles : part.cannons;
@@ -65,11 +74,12 @@ function buildDieResults(
             isRift,
             attackerComputers: computers,
           });
+          diceDetail.push({ color: sym.color, value: face.value });
         }
       }
     }
   }
-  return results;
+  return { results, diceDetail };
 }
 
 // ── Damage Helpers ────────────────────────────────────────────────────────
@@ -113,6 +123,7 @@ export interface BattlePairResult {
   winnerId: string | null;
   survivors: BattleShip[];
   rounds: number;
+  events?: BattleEvent[];
 }
 
 export function resolveBattlePair(
@@ -120,6 +131,7 @@ export function resolveBattlePair(
   defender: { factionId: string; ships: BattleShip[] },
   diceEngine: DiceEngine,
   isNpcDefender: boolean,
+  trackEvents = false,
 ): BattlePairResult {
   let aShips: BattleShip[] = attacker.ships.map(s => ({ ...s }));
   let dShips: BattleShip[] = defender.ships.map(s => ({ ...s }));
@@ -138,22 +150,54 @@ export function resolveBattlePair(
     );
   }
 
+  const events: BattleEvent[] = [];
+
   function fireShipType(
     firingFactionId: string,
     shipType: ShipType,
     myShips: BattleShip[],
     enemyShips: BattleShip[],
     getMissiles: boolean,
+    round: number,
+    trackEvents: boolean,
   ): { my: BattleShip[]; enemy: BattleShip[] } {
     const group = myShips.filter(s => s.blueprint.shipType === shipType);
     if (group.length === 0 || enemyShips.length === 0) return { my: myShips, enemy: enemyShips };
-    const dieResults = buildDieResults(group, diceEngine, getMissiles);
+    const { results: dieResults, diceDetail } = buildDieResults(group, diceEngine, getMissiles);
     if (dieResults.length === 0) return { my: myShips, enemy: enemyShips };
     const isNpcFiring = isNpcDefender && firingFactionId === dId;
     const ownRiftShips = group.filter(s => s.hasRiftWeapon);
+
+    // Snapshot enemy hull before damage to detect kills
+    const hullBefore = trackEvents ? new Map(enemyShips.map(s => [s.id, s.currentHull])) : null;
+
     const resolved = resolveHits(dieResults, enemyShips, ownRiftShips, isNpcFiring);
     applyAssignments(enemyShips, resolved.enemyDamage);
     applyAssignments(myShips, resolved.backfireDamage);
+
+    if (trackEvents) {
+      const totalDamage = resolved.enemyDamage.reduce((s, a) => s + a.damage, 0);
+      const hits = resolved.enemyDamage.length;
+      // Detect destroyed ships
+      const killCounts = new Map<ShipType, number>();
+      for (const ship of enemyShips) {
+        if (ship.currentHull < 0 && hullBefore!.get(ship.id)! >= 0) {
+          killCounts.set(ship.blueprint.shipType, (killCounts.get(ship.blueprint.shipType) ?? 0) + 1);
+        }
+      }
+      events.push({
+        phase: getMissiles ? 'missile' : 'cannon',
+        round,
+        factionId: firingFactionId,
+        shipType,
+        shipCount: group.length,
+        dice: diceDetail,
+        hits,
+        damageDealt: totalDamage,
+        kills: Array.from(killCounts.entries()).map(([type, count]) => ({ type, count })),
+      });
+    }
+
     return { my: removeDead(myShips), enemy: removeDead(enemyShips) };
   }
 
@@ -163,10 +207,10 @@ export function resolveBattlePair(
     if (aShips.length === 0 || dShips.length === 0) break;
     const isAttacker = entry.factionId === aId;
     if (isAttacker) {
-      const r = fireShipType(aId, entry.shipType, aShips, dShips, true);
+      const r = fireShipType(aId, entry.shipType, aShips, dShips, true, 0, trackEvents);
       aShips = r.my; dShips = r.enemy;
     } else {
-      const r = fireShipType(dId, entry.shipType, dShips, aShips, true);
+      const r = fireShipType(dId, entry.shipType, dShips, aShips, true, 0, trackEvents);
       dShips = r.my; aShips = r.enemy;
     }
   }
@@ -186,10 +230,10 @@ export function resolveBattlePair(
       if (aShips.length === 0 || dShips.length === 0) break;
       const isAttacker = entry.factionId === aId;
       if (isAttacker) {
-        const r = fireShipType(aId, entry.shipType, aShips, dShips, false);
+        const r = fireShipType(aId, entry.shipType, aShips, dShips, false, rounds, trackEvents);
         aShips = r.my; dShips = r.enemy;
       } else {
-        const r = fireShipType(dId, entry.shipType, dShips, aShips, false);
+        const r = fireShipType(dId, entry.shipType, dShips, aShips, false, rounds, trackEvents);
         dShips = r.my; aShips = r.enemy;
       }
     }
@@ -200,7 +244,7 @@ export function resolveBattlePair(
   const winnerId = aAlive && !dAlive ? aId : dAlive && !aAlive ? dId : null;
   const survivors = winnerId === aId ? aShips : winnerId === dId ? dShips : [];
 
-  return { winnerId, survivors, rounds };
+  return { winnerId, survivors, rounds, events: trackEvents ? events : undefined };
 }
 
 // ── Sector Battle ─────────────────────────────────────────────────────────
@@ -209,12 +253,14 @@ export interface SectorBattleResult {
   winnerId: string | null;
   survivors: { factionId: string; ships: ShipSurvival[] }[];
   battleLog: BattlePairResult[];
+  events?: BattleEvent[];
 }
 
 export function simulateSectorBattle(
   setup: SectorSetup,
   factions: Record<string, Faction>,
   diceEngine: DiceEngine,
+  trackEvents = false,
 ): SectorBattleResult {
   // Build battle ships for player factions
   const shipMap = new Map<string, BattleShip[]>();
@@ -248,7 +294,7 @@ export function simulateSectorBattle(
     ...npcQueue,
   ];
 
-  if (battleQueue.length === 0) return { winnerId: null, survivors: [], battleLog: [] };
+  if (battleQueue.length === 0) return { winnerId: null, survivors: [], battleLog: [], events: [] };
 
   if (battleQueue.length === 1) {
     const { factionId } = battleQueue[0];
@@ -274,11 +320,13 @@ export function simulateSectorBattle(
       { factionId: next.factionId, ships: nextShips },
       diceEngine,
       next.isNpc,
+      trackEvents,
     );
     battleLog.push(result);
 
     if (result.winnerId === null) {
-      return { winnerId: null, survivors: [], battleLog };
+      const allEvents = trackEvents ? battleLog.flatMap(r => r.events ?? []) : undefined;
+      return { winnerId: null, survivors: [], battleLog, events: allEvents };
     }
 
     currentId = result.winnerId;
@@ -286,10 +334,12 @@ export function simulateSectorBattle(
     currentShips = result.survivors;
   }
 
+  const allEvents = trackEvents ? battleLog.flatMap(r => r.events ?? []) : undefined;
   return {
     winnerId: currentId,
     survivors: [{ factionId: currentId, ships: shipsToSurvival(currentShips) }],
     battleLog,
+    events: allEvents,
   };
 }
 
@@ -314,11 +364,15 @@ export function runSimulations(
 
   const runs: SimulationRunResult[] = [];
 
+  const MAX_DETAILED_RUNS = 100;
+
   for (let i = 0; i < config.runs; i++) {
-    const result = simulateSectorBattle(setup, factions, diceEngine);
+    const detailed = i < MAX_DETAILED_RUNS;
+    const result = simulateSectorBattle(setup, factions, diceEngine, detailed);
     const runResult: SimulationRunResult = {
       winnerId: result.winnerId,
       survivors: result.survivors,
+      events: result.events,
     };
     runs.push(runResult);
 

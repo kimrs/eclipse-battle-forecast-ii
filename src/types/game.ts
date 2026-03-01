@@ -131,9 +131,22 @@ export interface FactionResult {
   avgDamageDealt: number;
 }
 
+export interface BattleEvent {
+  phase: 'missile' | 'cannon';
+  round: number;           // 0 for missiles, 1+ for engagement
+  factionId: string;
+  shipType: ShipType;
+  shipCount: number;
+  dice: { color: DieColor; value: DieValue }[];
+  hits: number;
+  damageDealt: number;
+  kills: { type: ShipType; count: number }[];
+}
+
 export interface SimulationRunResult {
   winnerId: string | null;  // null = mutual destruction
   survivors: { factionId: string; ships: ShipSurvival[] }[];
+  events?: BattleEvent[];
 }
 
 export interface SimulationResults {

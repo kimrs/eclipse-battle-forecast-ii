@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { SimulationRunResult, Faction } from '../types/game';
+import type { SimulationRunResult, Faction, BattleEvent, DieColor, DieValue } from '../types/game';
 
 interface SimulationLogProps {
   runs: SimulationRunResult[];
@@ -28,6 +28,54 @@ function formatSurvivors(
     .join(', ');
 }
 
+const DIE_BG: Record<DieColor, string> = {
+  yellow: 'bg-yellow-400 text-yellow-900',
+  orange: 'bg-orange-400 text-orange-900',
+  blue: 'bg-blue-500 text-white',
+  red: 'bg-red-500 text-white',
+  pink: 'bg-pink-400 text-pink-900',
+};
+
+function DieChip({ color, value }: { color: DieColor; value: DieValue }) {
+  const label = value === 'star' ? '\u2605' : value === 'blank' ? '\u00D8' : String(value);
+  return (
+    <span className={`inline-block text-[10px] leading-none px-1 py-0.5 rounded font-bold ${DIE_BG[color]}`}>
+      {label}
+    </span>
+  );
+}
+
+function EventRow({ event, factions }: { event: BattleEvent; factions: Faction[] }) {
+  const name = getFactionName(factions, event.factionId);
+  const phaseLabel = event.phase === 'missile' ? 'Missile' : `Round ${event.round}`;
+  return (
+    <div className="flex flex-col gap-0.5 py-1 border-b border-gray-800 last:border-0">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-gray-500 text-[10px] uppercase w-16 shrink-0">{phaseLabel}</span>
+        <span className="text-blue-300 text-xs">{name}</span>
+        <span className="text-gray-500 text-xs">
+          {event.shipCount}x {event.shipType}
+        </span>
+        <span className="text-gray-600 text-[10px]">
+          {event.hits > 0
+            ? `${event.damageDealt} dmg`
+            : 'miss'}
+        </span>
+        {event.kills.length > 0 && (
+          <span className="text-red-400 text-[10px]">
+            destroyed {event.kills.map(k => `${k.count}x ${k.type}`).join(', ')}
+          </span>
+        )}
+      </div>
+      <div className="flex gap-0.5 flex-wrap ml-16">
+        {event.dice.map((d, i) => (
+          <DieChip key={i} color={d.color} value={d.value} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function RunRow({
   index,
   run,
@@ -50,7 +98,7 @@ function RunRow({
         onClick={onToggle}
         className="w-full flex items-center gap-2 px-4 py-2.5 bg-gray-800 hover:bg-gray-750 text-left transition-colors text-sm"
       >
-        <span className="text-gray-400 shrink-0">{expanded ? '▼' : '▶'}</span>
+        <span className="text-gray-400 shrink-0">{expanded ? '\u25BC' : '\u25B6'}</span>
         <span className="text-gray-200 font-mono">
           Run #{index + 1}:
         </span>
@@ -67,21 +115,45 @@ function RunRow({
 
       {expanded && (
         <div className="bg-gray-900 px-4 py-3 font-mono text-xs space-y-1 border-t border-gray-700">
-          {run.survivors.length === 0 ? (
-            <p className="text-gray-500">No survivors — mutual destruction.</p>
-          ) : (
-            run.survivors.map(({ factionId, ships }) => (
-              <div key={factionId} className="text-gray-300">
-                <span className="text-gray-400">{getFactionName(factions, factionId)}:</span>{' '}
-                {ships.length === 0
-                  ? 'no ships'
-                  : ships.map(s => `${s.count}× ${s.type}`).join(', ')}
+          {run.events && run.events.length > 0 ? (
+            <div className="space-y-0">
+              {run.events.map((event, i) => (
+                <EventRow key={i} event={event} factions={factions} />
+              ))}
+              <div className="border-t border-gray-700 mt-2 pt-2">
+                {run.survivors.length === 0 ? (
+                  <p className="text-gray-500">No survivors — mutual destruction.</p>
+                ) : (
+                  run.survivors.map(({ factionId, ships }) => (
+                    <div key={factionId} className="text-gray-300">
+                      <span className="text-gray-400">{getFactionName(factions, factionId)} survivors:</span>{' '}
+                      {ships.length === 0
+                        ? 'none'
+                        : ships.map(s => `${s.count}\u00D7 ${s.type}`).join(', ')}
+                    </div>
+                  ))
+                )}
               </div>
-            ))
+            </div>
+          ) : (
+            <>
+              {run.survivors.length === 0 ? (
+                <p className="text-gray-500">No survivors — mutual destruction.</p>
+              ) : (
+                run.survivors.map(({ factionId, ships }) => (
+                  <div key={factionId} className="text-gray-300">
+                    <span className="text-gray-400">{getFactionName(factions, factionId)}:</span>{' '}
+                    {ships.length === 0
+                      ? 'no ships'
+                      : ships.map(s => `${s.count}\u00D7 ${s.type}`).join(', ')}
+                  </div>
+                ))
+              )}
+              <div className="text-gray-600 mt-1">
+                Detailed log not available for this run.
+              </div>
+            </>
           )}
-          <div className="text-gray-600 mt-1">
-            Winner: {run.winnerId === null ? 'none (draw)' : getFactionName(factions, run.winnerId)}
-          </div>
         </div>
       )}
     </div>

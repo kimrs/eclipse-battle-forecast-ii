@@ -83,7 +83,7 @@ export function BattlePage() {
   const [factions] = useLocalStorage<Faction[]>('eclipse-factions', []);
   const [factionDeployments, setFactionDeployments] = useState<FactionDeployment[]>([]);
   const [npcDeployments, setNpcDeployments] = useState<NpcDeployment[]>([]);
-  const [config, setConfig] = useState<SimulationConfig>({ runs: 100, dicePool: 600 });
+  const [config, setConfig] = useState<SimulationConfig>({ runs: 10000, dicePool: 600 });
 
   const errors = getValidationErrors(factionDeployments, npcDeployments, config, factions);
   const isValid = errors.length === 0;

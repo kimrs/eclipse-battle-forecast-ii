@@ -18,8 +18,9 @@ interface ChartEntry {
 }
 
 function buildChartData(results: SimulationResults, factions: Faction[]): ChartEntry[] {
-  const totalRuns = results.runs.length;
-  const drawCount = results.runs.filter(r => r.winnerId === null).length;
+  const totalRuns = results.config.runs;
+  const totalWins = results.summary.reduce((sum, s) => sum + s.wins, 0);
+  const drawCount = totalRuns - totalWins;
   return [
     ...factions.map((f, i) => {
       const wins = results.summary.find(s => s.factionId === f.id)?.wins ?? 0;
@@ -125,7 +126,7 @@ function drawChart(
 export function ResultsChart({ results, factions }: ResultsChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const totalRuns = results.runs.length;
+  const totalRuns = results.config.runs;
   const chartData = buildChartData(results, factions);
 
   useEffect(() => {

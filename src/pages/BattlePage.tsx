@@ -1,6 +1,6 @@
-import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useLocalStorage } from '../hooks/useLocalStorage';
+import { useSessionStorage } from '../hooks/useSessionStorage';
 import { BattleSetup } from '../components/BattleSetup';
 import type {
   Faction,
@@ -81,9 +81,9 @@ function getValidationErrors(
 export function BattlePage() {
   const navigate = useNavigate();
   const [factions] = useLocalStorage<Faction[]>('eclipse-factions', []);
-  const [factionDeployments, setFactionDeployments] = useState<FactionDeployment[]>([]);
-  const [npcDeployments, setNpcDeployments] = useState<NpcDeployment[]>([]);
-  const [config, setConfig] = useState<SimulationConfig>({ runs: 1000, dicePool: 600 });
+  const [factionDeployments, setFactionDeployments] = useSessionStorage<FactionDeployment[]>('eclipse-faction-deployments', []);
+  const [npcDeployments, setNpcDeployments] = useSessionStorage<NpcDeployment[]>('eclipse-npc-deployments', []);
+  const [config, setConfig] = useSessionStorage<SimulationConfig>('eclipse-sim-config', { runs: 1000, dicePool: 600 });
 
   const errors = getValidationErrors(factionDeployments, npcDeployments, config, factions);
   const isValid = errors.length === 0;

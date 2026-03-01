@@ -2,34 +2,36 @@ import { useState } from 'react';
 import { BlueprintEditor } from '../components/BlueprintEditor';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { SPECIES_PRESETS } from '../data/species';
+import type { BlueprintPreset } from '../data/species';
 import { SHIP_PARTS } from '../data/shipParts';
 import type { Faction, ShipType, Blueprint } from '../types/game';
 
 const SHIP_TYPES: ShipType[] = ['interceptor', 'cruiser', 'dreadnought', 'starbase'];
 
-const DEFAULT_SHIP_PROPS: Record<ShipType, { slots: number; initiativeBonus: number }> = {
-  interceptor: { slots: 4, initiativeBonus: 0 },
-  cruiser: { slots: 6, initiativeBonus: 0 },
-  dreadnought: { slots: 8, initiativeBonus: 0 },
-  starbase: { slots: 5, initiativeBonus: 4 },
-};
+const PART_BY_ID = Object.fromEntries(SHIP_PARTS.map(p => [p.id, p]));
 
-function makeEmptyBlueprint(shipType: ShipType): Blueprint {
-  const { slots, initiativeBonus } = DEFAULT_SHIP_PROPS[shipType];
-  return { shipType, slots, initiativeBonus, parts: [] };
+function buildBlueprintFromPreset(shipType: ShipType, cfg: BlueprintPreset): Blueprint {
+  return {
+    shipType,
+    initiativeBonus: cfg.initiativeBonus,
+    slots: cfg.slots,
+    parts: cfg.defaultParts.map(id => PART_BY_ID[id]).filter(Boolean),
+    ...(cfg.innateComputers && { innateComputers: cfg.innateComputers }),
+    ...(cfg.innateShields && { innateShields: cfg.innateShields }),
+    ...(cfg.innateHull && { innateHull: cfg.innateHull }),
+    ...(cfg.innateInitiative && { innateInitiative: cfg.innateInitiative }),
+    ...(cfg.innateEnergyProduction && { innateEnergyProduction: cfg.innateEnergyProduction }),
+  };
 }
 
-function makeEmptyFaction(name: string): Faction {
-  return {
+function makeDefaultFactions(): Faction[] {
+  return SPECIES_PRESETS.map(preset => ({
     id: crypto.randomUUID(),
-    name,
-    blueprints: {
-      interceptor: makeEmptyBlueprint('interceptor'),
-      cruiser: makeEmptyBlueprint('cruiser'),
-      dreadnought: makeEmptyBlueprint('dreadnought'),
-      starbase: makeEmptyBlueprint('starbase'),
-    },
-  };
+    name: preset.name,
+    blueprints: Object.fromEntries(
+      SHIP_TYPES.map(st => [st, buildBlueprintFromPreset(st, preset.blueprints[st])]),
+    ) as Faction['blueprints'],
+  }));
 }
 
 const SHIP_TYPE_LABELS: Record<ShipType, string> = {
@@ -40,9 +42,7 @@ const SHIP_TYPE_LABELS: Record<ShipType, string> = {
 };
 
 export function BlueprintPage() {
-  const [factions, setFactions] = useLocalStorage<Faction[]>('eclipse-factions', [
-    makeEmptyFaction('My Fleet'),
-  ]);
+  const [factions, setFactions] = useLocalStorage<Faction[]>('eclipse-factions', makeDefaultFactions);
   const [activeFactionId, setActiveFactionId] = useState<string>(
     () => factions[0]?.id ?? ''
   );
@@ -53,6 +53,7 @@ export function BlueprintPage() {
   const [pendingPreset, setPendingPreset] = useState<string | null>(null);
   const [newFactionName, setNewFactionName] = useState('');
   const [showNewFactionInput, setShowNewFactionInput] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   const activeFaction = factions.find(f => f.id === activeFactionId) ?? factions[0];
 
@@ -102,20 +103,11 @@ export function BlueprintPage() {
     const preset = SPECIES_PRESETS.find(p => p.id === pendingPreset);
     if (!preset) return;
 
-    const partById = Object.fromEntries(SHIP_PARTS.map(p => [p.id, p]));
     const newBlueprints = Object.fromEntries(
-      SHIP_TYPES.map(shipType => {
-        const cfg = preset.blueprints[shipType];
-        return [
-          shipType,
-          {
-            shipType,
-            initiativeBonus: cfg.initiativeBonus,
-            slots: cfg.slots,
-            parts: cfg.defaultParts.map(id => partById[id]).filter(Boolean),
-          } as Blueprint,
-        ];
-      })
+      SHIP_TYPES.map(shipType => [
+        shipType,
+        buildBlueprintFromPreset(shipType, preset.blueprints[shipType]),
+      ])
     ) as Faction['blueprints'];
 
     updateFaction({ ...activeFaction, blueprints: newBlueprints });
@@ -296,11 +288,16 @@ export function BlueprintPage() {
           </div>
         </div>
 
-        {/* Save to Browser */}
-        <div className="text-right">
+        {/* Save / Reset */}
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={() => setShowResetConfirm(true)}
+            className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            Reset to Defaults
+          </button>
           <button
             onClick={() => {
-              // useLocalStorage auto-saves on every change, but provide explicit feedback
               const key = 'eclipse-factions';
               window.localStorage.setItem(key, JSON.stringify(factions));
               alert('Factions saved to browser!');
@@ -332,6 +329,37 @@ export function BlueprintPage() {
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
               >
                 Load
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Confirmation Modal */}
+      {showResetConfirm && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-white text-gray-900 rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
+            <h2 className="font-bold text-lg mb-2">Reset to Defaults</h2>
+            <p className="text-gray-600 text-sm mb-4">
+              This will replace all factions and blueprints with the defaults. Any customizations will be lost. Continue?
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowResetConfirm(false)}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const defaults = makeDefaultFactions();
+                  setFactions(defaults);
+                  setActiveFactionId(defaults[0].id);
+                  setShowResetConfirm(false);
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700"
+              >
+                Reset
               </button>
             </div>
           </div>

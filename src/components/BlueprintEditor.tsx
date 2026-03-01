@@ -102,6 +102,18 @@ export function BlueprintEditor({ blueprint, onChange }: BlueprintEditorProps) {
         ))}
       </div>
 
+      {/* Innate Bonuses */}
+      {(blueprint.innateComputers || blueprint.innateShields || blueprint.innateHull || blueprint.innateInitiative || blueprint.innateEnergyProduction) && (
+        <div className="border border-blue-200 rounded-lg p-2 bg-blue-50 text-xs text-blue-700 mb-4 flex flex-wrap gap-3">
+          <span className="font-semibold">Innate:</span>
+          {!!blueprint.innateComputers && <span>+{blueprint.innateComputers} computer</span>}
+          {!!blueprint.innateShields && <span>+{blueprint.innateShields} shield</span>}
+          {!!blueprint.innateHull && <span>+{blueprint.innateHull} hull</span>}
+          {!!blueprint.innateInitiative && <span>+{blueprint.innateInitiative} initiative</span>}
+          {!!blueprint.innateEnergyProduction && <span>+{blueprint.innateEnergyProduction} energy</span>}
+        </div>
+      )}
+
       {/* Stats Summary */}
       <div className="border rounded-lg p-3 bg-gray-50 text-sm space-y-1">
         <h4 className="font-semibold text-gray-600 mb-2">Stats Summary</h4>

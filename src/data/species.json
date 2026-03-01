@@ -1,0 +1,198 @@
+[
+  {
+    "id": "terran",
+    "name": "Terran Federation",
+    "blueprints": {
+      "interceptor": {
+        "initiativeBonus": 2,
+        "slots": 4,
+        "defaultParts": ["nuclear-source", "nuclear-drive", "ion-cannon"]
+      },
+      "cruiser": {
+        "initiativeBonus": 1,
+        "slots": 6,
+        "defaultParts": ["nuclear-source", "electron-computer", "ion-cannon", "hull"]
+      },
+      "dreadnought": {
+        "initiativeBonus": 0,
+        "slots": 8,
+        "defaultParts": ["nuclear-source", "electron-computer", "ion-cannon", "ion-cannon", "hull", "hull"]
+      },
+      "starbase": {
+        "initiativeBonus": 4,
+        "slots": 5,
+        "defaultParts": ["ion-cannon", "hull"]
+      }
+    }
+  },
+  {
+    "id": "eridani",
+    "name": "Eridani Empire",
+    "blueprints": {
+      "interceptor": {
+        "initiativeBonus": 2,
+        "slots": 4,
+        "defaultParts": ["nuclear-source", "nuclear-drive", "ion-cannon"],
+        "innateEnergyProduction": 1
+      },
+      "cruiser": {
+        "initiativeBonus": 1,
+        "slots": 6,
+        "defaultParts": ["nuclear-source", "electron-computer", "ion-cannon", "hull"],
+        "innateEnergyProduction": 1
+      },
+      "dreadnought": {
+        "initiativeBonus": 0,
+        "slots": 8,
+        "defaultParts": ["nuclear-source", "electron-computer", "ion-cannon", "ion-cannon", "hull", "hull"],
+        "innateEnergyProduction": 1
+      },
+      "starbase": {
+        "initiativeBonus": 4,
+        "slots": 5,
+        "defaultParts": ["ion-cannon", "hull"]
+      }
+    }
+  },
+  {
+    "id": "hydran",
+    "name": "Hydran Progress",
+    "blueprints": {
+      "interceptor": {
+        "initiativeBonus": 2,
+        "slots": 4,
+        "defaultParts": ["nuclear-source", "nuclear-drive", "ion-cannon"]
+      },
+      "cruiser": {
+        "initiativeBonus": 1,
+        "slots": 6,
+        "defaultParts": ["nuclear-source", "electron-computer", "ion-cannon", "hull"]
+      },
+      "dreadnought": {
+        "initiativeBonus": 0,
+        "slots": 8,
+        "defaultParts": ["nuclear-source", "electron-computer", "ion-cannon", "plasma-cannon", "hull", "hull"]
+      },
+      "starbase": {
+        "initiativeBonus": 4,
+        "slots": 5,
+        "defaultParts": ["ion-cannon", "hull"]
+      }
+    }
+  },
+  {
+    "id": "planta",
+    "name": "Planta",
+    "blueprints": {
+      "interceptor": {
+        "initiativeBonus": 2,
+        "slots": 3,
+        "defaultParts": ["nuclear-drive", "ion-cannon"],
+        "innateComputers": 1,
+        "innateEnergyProduction": 2
+      },
+      "cruiser": {
+        "initiativeBonus": 1,
+        "slots": 5,
+        "defaultParts": ["ion-cannon", "hull", "hull"],
+        "innateComputers": 1,
+        "innateEnergyProduction": 2
+      },
+      "dreadnought": {
+        "initiativeBonus": 0,
+        "slots": 7,
+        "defaultParts": ["ion-cannon", "ion-cannon", "hull", "hull"],
+        "innateComputers": 1,
+        "innateEnergyProduction": 2
+      },
+      "starbase": {
+        "initiativeBonus": 4,
+        "slots": 4,
+        "defaultParts": ["ion-cannon", "hull"],
+        "innateComputers": 1,
+        "innateEnergyProduction": 5
+      }
+    }
+  },
+  {
+    "id": "draco",
+    "name": "Descendants of Draco",
+    "blueprints": {
+      "interceptor": {
+        "initiativeBonus": 2,
+        "slots": 4,
+        "defaultParts": ["nuclear-source", "nuclear-drive", "ion-cannon"]
+      },
+      "cruiser": {
+        "initiativeBonus": 1,
+        "slots": 6,
+        "defaultParts": ["nuclear-source", "electron-computer", "ion-cannon", "hull"]
+      },
+      "dreadnought": {
+        "initiativeBonus": 0,
+        "slots": 8,
+        "defaultParts": ["nuclear-source", "electron-computer", "ion-cannon", "ion-cannon", "hull", "hull"]
+      },
+      "starbase": {
+        "initiativeBonus": 4,
+        "slots": 5,
+        "defaultParts": ["ion-cannon", "hull"]
+      }
+    }
+  },
+  {
+    "id": "mechanema",
+    "name": "Mechanema",
+    "blueprints": {
+      "interceptor": {
+        "initiativeBonus": 2,
+        "slots": 4,
+        "defaultParts": ["nuclear-source", "nuclear-drive", "ion-cannon"]
+      },
+      "cruiser": {
+        "initiativeBonus": 1,
+        "slots": 6,
+        "defaultParts": ["nuclear-source", "electron-computer", "ion-cannon", "hull"]
+      },
+      "dreadnought": {
+        "initiativeBonus": 0,
+        "slots": 8,
+        "defaultParts": ["nuclear-source", "electron-computer", "ion-cannon", "ion-cannon", "hull", "hull"]
+      },
+      "starbase": {
+        "initiativeBonus": 4,
+        "slots": 5,
+        "defaultParts": ["ion-cannon", "hull"]
+      }
+    }
+  },
+  {
+    "id": "orion",
+    "name": "Orion Hegemony",
+    "blueprints": {
+      "interceptor": {
+        "initiativeBonus": 2,
+        "slots": 4,
+        "defaultParts": ["nuclear-source", "nuclear-drive", "ion-cannon"],
+        "innateEnergyProduction": 1
+      },
+      "cruiser": {
+        "initiativeBonus": 1,
+        "slots": 6,
+        "defaultParts": ["nuclear-source", "electron-computer", "ion-cannon", "hull"],
+        "innateEnergyProduction": 2
+      },
+      "dreadnought": {
+        "initiativeBonus": 0,
+        "slots": 8,
+        "defaultParts": ["nuclear-source", "electron-computer", "ion-cannon", "ion-cannon", "hull", "hull"],
+        "innateEnergyProduction": 3
+      },
+      "starbase": {
+        "initiativeBonus": 4,
+        "slots": 5,
+        "defaultParts": ["ion-cannon", "hull"]
+      }
+    }
+  }
+]

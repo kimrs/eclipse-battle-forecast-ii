@@ -49,6 +49,12 @@ export interface Blueprint {
   initiativeBonus: number; // printed on the blueprint tile
   slots: number;           // max number of ship part slots
   parts: ShipPart[];       // currently equipped parts
+  // Innate bonuses (species-specific, don't occupy slots)
+  innateComputers?: number;
+  innateShields?: number;
+  innateHull?: number;
+  innateInitiative?: number;
+  innateEnergyProduction?: number;
 }
 
 function aggregateDieSymbols(symbols: DieSymbol[][]): DieSymbol[] {
@@ -74,11 +80,11 @@ export function computeBlueprintStats(blueprint: Blueprint): {
   return {
     cannons: aggregateDieSymbols(parts.map(p => p.cannons)),
     missiles: aggregateDieSymbols(parts.map(p => p.missiles)),
-    computers: parts.reduce((sum, p) => sum + p.computers, 0),
-    shields: parts.reduce((sum, p) => sum + p.shields, 0),
-    hull: parts.reduce((sum, p) => sum + p.hull, 0),
-    initiative: initiativeBonus + parts.reduce((sum, p) => sum + p.initiative, 0),
-    energyBalance: parts.reduce((sum, p) => sum + p.energyProduction - p.energyConsumption, 0),
+    computers: parts.reduce((sum, p) => sum + p.computers, 0) + (blueprint.innateComputers ?? 0),
+    shields: parts.reduce((sum, p) => sum + p.shields, 0) + (blueprint.innateShields ?? 0),
+    hull: parts.reduce((sum, p) => sum + p.hull, 0) + (blueprint.innateHull ?? 0),
+    initiative: initiativeBonus + parts.reduce((sum, p) => sum + p.initiative, 0) + (blueprint.innateInitiative ?? 0),
+    energyBalance: parts.reduce((sum, p) => sum + p.energyProduction - p.energyConsumption, 0) + (blueprint.innateEnergyProduction ?? 0),
   };
 }
 

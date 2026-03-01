@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Logs
+*.log
+
+# Copyrighted materials
+rulebook.pdf
+*.pdf
+rules-rift-cannon.jpg
+
+# Local settings
+.claude/settings.local.json

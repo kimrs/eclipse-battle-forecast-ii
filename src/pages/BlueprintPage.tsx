@@ -34,6 +34,23 @@ function makeDefaultFactions(): Faction[] {
   }));
 }
 
+const DEFAULT_SHIP_PROPS: Record<ShipType, { slots: number; initiativeBonus: number }> = {
+  interceptor: { slots: 4, initiativeBonus: 2 },
+  cruiser: { slots: 6, initiativeBonus: 1 },
+  dreadnought: { slots: 8, initiativeBonus: 0 },
+  starbase: { slots: 5, initiativeBonus: 4 },
+};
+
+function makeEmptyFaction(name: string): Faction {
+  return {
+    id: crypto.randomUUID(),
+    name,
+    blueprints: Object.fromEntries(
+      SHIP_TYPES.map(st => [st, { shipType: st, ...DEFAULT_SHIP_PROPS[st], parts: [] }]),
+    ) as Faction['blueprints'],
+  };
+}
+
 const SHIP_TYPE_LABELS: Record<ShipType, string> = {
   interceptor: 'Interceptor',
   cruiser: 'Cruiser',
@@ -42,7 +59,7 @@ const SHIP_TYPE_LABELS: Record<ShipType, string> = {
 };
 
 export function BlueprintPage() {
-  const [factions, setFactions] = useLocalStorage<Faction[]>('eclipse-factions', makeDefaultFactions);
+  const [factions, setFactions] = useLocalStorage<Faction[]>('eclipse-factions', makeDefaultFactions());
   const [activeFactionId, setActiveFactionId] = useState<string>(
     () => factions[0]?.id ?? ''
   );

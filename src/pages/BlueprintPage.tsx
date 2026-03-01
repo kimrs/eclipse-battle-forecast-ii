@@ -47,7 +47,7 @@ function makeEmptyFaction(name: string): Faction {
     name,
     blueprints: Object.fromEntries(
       SHIP_TYPES.map(st => [st, { shipType: st, ...DEFAULT_SHIP_PROPS[st], parts: [] }]),
-    ) as Faction['blueprints'],
+    ) as unknown as Faction['blueprints'],
   };
 }
 

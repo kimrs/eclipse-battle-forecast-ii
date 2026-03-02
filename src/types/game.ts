@@ -112,6 +112,7 @@ export interface NpcDeployment {
   type: NpcType;
   blueprint: Blueprint;      // uses NPC blueprint tile
   count: number;             // number of NPC ships
+  turnOfEntry?: number;      // optional — NPC join order
 }
 
 export interface SectorSetup {

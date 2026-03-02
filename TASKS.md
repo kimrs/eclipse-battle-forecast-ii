@@ -1,88 +1,43 @@
-# Eclipse Combat Forecast II — Task List
+# Eclipse Combat Forecast II — Mobile-First Redesign Tasks
 
 Each task is a self-contained unit of work for `claude run`.
 Mark completed tasks with ✅. Skip tasks already marked ✅.
 
-Read the relevant spec file(s) in `specs/` before starting each task.
-Run `npm run build` (once scaffolded) after your changes to verify no TypeScript errors.
-Run `npx vitest run` after any task that includes tests.
+Read `specs/mobile-first-redesign.md` before starting each task.
+Run `npm run build` after your changes to verify no TypeScript errors.
+Run `npx vitest run` after any task that touches engine code or tests.
 
 ---
 
 ## Tasks
 
-- [x] **Task 1: Scaffold project**
-  Specs: `specs/overview.md`
-  Initialize a Vite + React 18 + TypeScript project. Install dependencies: react, react-dom, react-router-dom, d3. Install devDependencies: @types/react, @types/react-dom, @types/d3, typescript, vite, @vitejs/plugin-react, tailwindcss, postcss, autoprefixer, vitest. Configure Tailwind CSS (tailwind.config.js, postcss.config.js, add Tailwind directives to index.css). Create the directory structure: `src/types/`, `src/data/`, `src/engine/`, `src/components/`, `src/pages/`, `src/hooks/`, `src/utils/`. Add a minimal `index.html`, `src/main.tsx`, and `src/App.tsx` placeholder. Verify `npm run dev` starts without errors.
+- [x] **Task 1: Blank die face for misses**
+  Specs: `specs/mobile-first-redesign.md` §4
+  In `src/components/SimulationLog.tsx`, update the `DieChip` component. Change the blank die label from `'\u00D8'` (ø) to an empty string `''`. Add a `min-w-[1.2em]` Tailwind class to the chip's `<span>` so blank chips maintain the same dimensions as chips with characters. The chip should still render with its die color background — just no text inside. Verify the change visually: `[★] [5] [ ] [3] [ ]` instead of `[★] [5] [ø] [3] [ø]`.
 
-- [x] **Task 2: Core types**
-  Specs: `specs/types-and-data.md` (Types section)
-  Create `src/types/game.ts` with all TypeScript types and interfaces: DieValue, DieFace, DieColor, DieDefinition, DieSymbol, ShipPart, ShipType, Blueprint, computeBlueprintStats function, Faction, NpcType, FactionDeployment, NpcDeployment, SectorSetup, SimulationConfig, ShipSurvival, FactionResult, SimulationRunResult, SimulationResults, BattleShip. Export everything. The computeBlueprintStats function should be a pure function that aggregates part stats.
+- [x] **Task 2: Remove draw from results chart data**
+  Specs: `specs/mobile-first-redesign.md` §3 (No Draw Concept)
+  In `src/components/ResultsChart.tsx`, update the `buildChartData` function (or equivalent) to stop appending a "Draw" entry. Win percentages should be computed as `faction.wins / totalWins` where `totalWins = sum of all faction wins`, not `totalRuns`. Remove the `DRAW_COLOR` constant if it becomes unused. In `src/pages/ResultsPage.tsx`, remove the "Draw" row from the Per-Faction Statistics table. The total run count in the header should still reflect all runs.
 
-- [x] **Task 3: Dice data**
-  Specs: `specs/types-and-data.md` (dice.ts section)
-  Create `src/data/dice.ts`. Define and export the `DICE` constant: a Record<DieColor, DieDefinition> with all 5 die colors (yellow, orange, blue, red, pink). Each die has exactly 6 faces. Pink die has ignoresShields and ignoresComputers set to true, and uses star/blank values with selfDamage. Import types from `src/types/game.ts`.
+- [x] **Task 3: Replace bar chart with pie chart**
+  Specs: `specs/mobile-first-redesign.md` §3 (Pie Chart)
+  Rewrite `src/components/ResultsChart.tsx` to render a D3 pie chart instead of horizontal bars. Use `d3.pie()` and `d3.arc()`. One segment per faction, sized by win percentage (draws excluded per Task 2). Keep the existing `PALETTE` for colors. Add a legend below the chart: colored circle + faction name + win percentage. The SVG should be responsive — pie diameter ~200–250px on phone (~375px width), capped at ~350px on wider screens. Add hover/tap interaction that highlights a segment and shows a tooltip with exact win count and percentage. Animate segments growing from 0 on load using D3 transitions.
 
-- [x] **Task 4: Ship parts data**
-  Specs: `specs/types-and-data.md` (shipParts.ts section)
-  Create `src/data/shipParts.ts`. Define and export `SHIP_PARTS: ShipPart[]` with all ship parts: Ion Cannon, Plasma Cannon, Soliton Cannon, Antimatter Cannon, Rift Cannon, Ion Missile, Plasma Missile, Antimatter Missile, Hull, Improved Hull, Electron Computer, Positron Computer, Gluon Computer, Gauss Shield, Phase Shield, Nuclear Drive, Fusion Drive, Tachyon Drive, Nuclear Source, Fusion Source, Tachyon Source, Antimatter Splitter, Rift Conductor. Each part has a unique id, name, and appropriate stats per the spec. Import types from `src/types/game.ts`.
+- [x] **Task 4: Convert three pages into sections**
+  Specs: `specs/mobile-first-redesign.md` §1
+  Convert `src/pages/BlueprintPage.tsx`, `src/pages/BattlePage.tsx`, and `src/pages/ResultsPage.tsx` from standalone routed pages into section components. Each should accept props for its state instead of managing its own top-level state or reading from storage/URL. Remove internal navigation logic (e.g., `useNavigate` calls). Add an `id` attribute to each section's root element (`blueprints`, `battle`, `results`) for anchor linking. Each section should be wrapped in a container with clear visual separation (e.g., border-top or spacing).
 
-- [x] **Task 5: Species presets data**
-  Specs: `specs/types-and-data.md` (species.ts section)
-  Create `src/data/species.ts`. Define and export `SPECIES_PRESETS: SpeciesPreset[]` for all 7 species: Terran, Eridani Empire, Hydran Progress, Planta, Descendants of Draco, Mechanema, Orion Hegemony. Each species defines default blueprints for all 4 ship types with initiativeBonus, slots, and defaultParts (referencing ShipPart IDs from shipParts.ts). Use reasonable defaults based on the Eclipse board game. Define the SpeciesPreset interface in this file.
+- [x] **Task 5: Single-page layout and state lift**
+  Specs: `specs/mobile-first-redesign.md` §1
+  Rewrite `src/App.tsx` to render all three sections vertically on one page instead of using React Router. Remove `react-router-dom` from imports and from `package.json` dependencies. Lift all shared state into `App.tsx` (or a new top-level hook): factions (from `useLocalStorage`), faction deployments, NPC deployments, simulation config, and simulation results. Remove `sessionStorage` usage for cross-page data transfer — the Results section reads directly from shared state. The Results section renders only after the user triggers a simulation, showing a placeholder until then. Update `src/main.tsx` to remove `BrowserRouter` wrapper. Add optional smooth-scroll anchor links in the header for `#blueprints`, `#battle`, `#results`. Run `npm run build` to confirm the app compiles with no router references remaining.
 
-- [x] **Task 6: NPC blueprints data**
-  Specs: `specs/types-and-data.md` (npcBlueprints.ts section)
-  Create `src/data/npcBlueprints.ts`. Define and export `NPC_BLUEPRINTS: Record<NpcType, { normal: Blueprint; advanced?: Blueprint }>` for Ancient, Guardian, and GCDS. Use the stats from the spec: Ancient (hull 1/2), Guardian (hull 2/3), GCDS (hull 7). Import types from `src/types/game.ts` and ship parts from `src/data/shipParts.ts`.
+- [x] **Task 6: Unified combatant list with ⊕ button**
+  Specs: `specs/mobile-first-redesign.md` §2
+  Rewrite `src/components/BattleSetup.tsx` to render factions and NPCs in a single interleaved list instead of two separate sections. Remove the separate "Add Faction" and "Add NPC" buttons. Add a single `⊕` button centered below the last combatant card. The button should be circular or rounded, minimum 44×44px tap target, subtle outline style. When tapped, show a selection (dropdown or bottom sheet) listing: (a) all user-created factions from localStorage, and (b) NPC options: Ancient (Normal), Ancient (Advanced), Guardian (Normal), Guardian (Advanced), GCDS. Selecting an option appends a new combatant card to the list.
 
-- [x] **Task 7: Dice engine + tests**
-  Specs: `specs/dice-engine.md`
-  Create `src/engine/diceEngine.ts` with: Fisher-Yates shuffle, generatePool, createDicePool, createDiceEngine, createDeterministicPool. The DiceEngine creates one pool per die color using DICE definitions. Pool draws sequentially and reshuffles on exhaustion. Create `src/engine/__tests__/diceEngine.test.ts` with tests: uniform distribution (600 rolls, each face exactly 100 times), independence between color pools, pool exhaustion and reshuffle, edge cases (pool size not divisible by 6 throws error, pool size 0 throws error), deterministic pool returns faces in exact order.
+- [x] **Task 7: NPC combatant cards**
+  Specs: `specs/mobile-first-redesign.md` §2 (NPC Cards)
+  Update `src/components/FactionPanel.tsx` (or create a sibling `NpcPanel.tsx` component) to handle NPC combatant cards in the unified list. NPC cards show: name as "Type (Variant)" (not editable), a single "Count" number input (not per-ship-type), a "Turn of Entry" input, and a remove button. No "Controls Sector" checkbox for NPCs. NPC blueprints come from `src/data/npcBlueprints.ts` and are not editable. The card styling should match faction cards but be visually distinguishable (e.g., a subtle accent border or icon).
 
-- [x] **Task 8: Initiative resolver + tests**
-  Specs: `specs/combat-engine.md` (initiativeResolver section)
-  Create `src/engine/initiativeResolver.ts` with the resolveInitiativeOrder function. Initiative = blueprint.initiativeBonus + sum of part initiatives. Sort descending. Ties: Defender fires first. Create `src/engine/__tests__/initiativeResolver.test.ts` with tests: known initiative ordering, tie-breaking favors Defender, only present ship types included.
-
-- [x] **Task 9: Hit assignment + tests**
-  Specs: `specs/combat-engine.md` (hitAssignment section)
-  Create `src/engine/hitAssignment.ts` with: hit determination logic (star/blank/numeric threshold), assignHitsOptimally (player: smallest first, NPC: largest first), assignBackfireDamage (largest Rift-armed first), resolveHits (combines all logic including per-target shield checks and Rift bypass). Create `src/engine/__tests__/hitAssignment.test.ts` with tests: 2 interceptors destroyed by 2 hits, dreadnought hull thresholds, optimal kill maximization, NPC largest-first assignment, Rift ignores shields/computers, backfire assignment to Rift-armed ships, mixed Rift + standard dice.
-
-- [x] **Task 10: Combat engine + tests**
-  Specs: `specs/combat-engine.md` (combatEngine section)
-  Create `src/engine/combatEngine.ts` with: resolveBattlePair (missile phase then engagement rounds), simulateSectorBattle (multi-faction pairing logic), runSimulations (Monte Carlo runner with aggregation). Create `src/engine/__tests__/combatEngine.test.ts` with tests: simple 1v1 with deterministic dice, missiles fire before engagement, stalemate detection (attacker loses), multi-faction pairing order.
-
-- [x] **Task 11: Hooks and utilities**
-  Specs: `specs/overview.md`, `specs/results-ui.md`
-  Create `src/hooks/useLocalStorage.ts` — a React hook that syncs state with localStorage (generic, typed, handles serialization/deserialization, returns [value, setValue]). Create `src/utils/stats.ts` — aggregation utilities for simulation results: count wins per faction, compute average survivors per ship type, compute average damage dealt, handle draws (winnerId = null).
-
-- [x] **Task 12: Blueprint editor + ship part selector components**
-  Specs: `specs/blueprint-ui.md` (BlueprintEditor and ShipPartSelector sections)
-  Create `src/components/BlueprintEditor.tsx` — displays ship part slots as a grid of cards, [Add]/[Remove] buttons, computes and shows stats summary (cannons, missiles, computer, shield, hull, initiative, energy balance). Energy balance: green if >= 0, red if negative. Create `src/components/ShipPartSelector.tsx` — modal/dropdown listing all ship parts from SHIP_PARTS, grouped by category, with filter/search, shows part stats inline, excludeDrives prop for Starbases. Use Tailwind CSS.
-
-- [x] **Task 13: Blueprint page**
-  Specs: `specs/blueprint-ui.md` (BlueprintPage and page layout sections)
-  Create `src/pages/BlueprintPage.tsx` — manages list of factions in state, renders faction tabs, active faction's blueprint editor with ship type tabs (Interceptor/Cruiser/Dreadnought/Starbase). Faction CRUD: create, rename, delete. "Load Preset" dropdown loads species presets. "Save to Browser" persists to localStorage via useLocalStorage hook. Default ship type properties: Interceptor 4 slots, Cruiser 6, Dreadnought 8, Starbase 5 (initiative bonus 4). Use Tailwind CSS. Navigation links to Battle and Results pages.
-
-- [x] **Task 14: Battle setup + faction panel components**
-  Specs: `specs/battle-setup-ui.md` (FactionPanel and BattleSetup sections)
-  Create `src/components/FactionPanel.tsx` — faction selector dropdown, ship count inputs (0-max per type), turn of entry input, "Controls Sector" checkbox, remove button. Create `src/components/BattleSetup.tsx` — wraps list of FactionPanels and NPC panels, manages add/remove logic for both factions and NPCs. NPC panel: type selector (Ancient/Guardian/GCDS), variant (Normal/Advanced), count input. Use Tailwind CSS.
-
-- [x] **Task 15: Battle page**
-  Specs: `specs/battle-setup-ui.md` (BattlePage and validation sections)
-  Create `src/pages/BattlePage.tsx` — loads factions from localStorage, manages FactionDeployment[] and NpcDeployment[] state, simulation config (runs, dicePool). Validation: at least 2 combatants, each faction has ships, ship counts within max, at most 1 sector controller, pool size divisible by 6, runs >= 1. Inline validation errors. "Run Simulation" button disabled until valid. On click: collect data, navigate to Results page passing setup data via React context or state. Use Tailwind CSS.
-
-- [x] **Task 16: Results chart + simulation log components**
-  Specs: `specs/results-ui.md` (ResultsChart and SimulationLog sections)
-  Create `src/components/ResultsChart.tsx` — D3.js horizontal bar chart showing win probability per faction + Draw. Use useRef for SVG container, useEffect for D3 bindings. Color-coded bars, percentage labels, tooltips on hover. Responsive. Create `src/components/SimulationLog.tsx` — shows first 20 runs with [Show More], each run is collapsible (collapsed: winner + survivors summary, expanded: battle details). [Expand All]/[Collapse All] toggle. Use Tailwind CSS.
-
-- [x] **Task 17: Results page**
-  Specs: `specs/results-ui.md` (ResultsPage and data flow sections)
-  Create `src/pages/ResultsPage.tsx` — receives battle setup from BattlePage via React context/state, runs runSimulations() on mount, shows loading/progress indicator, displays ResultsChart + statistics table + SimulationLog. Stats table: faction name, wins, win %, avg survivors per ship type, avg damage dealt. "Re-run Simulation" button. "Modify Setup" navigates back to BattlePage. Handle edge cases: mutual destruction as Draw, 0 simulations shows empty state. Use Tailwind CSS.
-
-- [x] **Task 18: App router + navigation**
-  Specs: `specs/overview.md` (Architecture section)
-  Update `src/App.tsx` with React Router: 3 routes for BlueprintPage (/), BattlePage (/battle), ResultsPage (/results). Add a shared navigation header with links to all 3 pages. Set up React context or state management for passing battle setup data from BattlePage to ResultsPage. Update `src/main.tsx` to wrap App in BrowserRouter. Verify all pages are accessible and navigation works. Run `npm run build` to confirm no errors.
-
-- [x] **Task 19: Integration test**
-  Specs: `specs/combat-engine.md` (Testing Requirements section), `specs/overview.md` (Verification Plan)
-  Create `src/engine/__tests__/integration.test.ts`. Set up a test that replicates a plausible Eclipse battle: create two factions with configured blueprints (e.g., Terran-style interceptors vs cruisers), run 1000 simulations via runSimulations(), verify results are plausible (win rates sum to ~100%, no crashes, survivors make sense). Also test: NPC battle (player vs Ancient), multi-faction 3-way battle resolves without errors, GCDS battle. All tests should pass with `npx vitest run`.
+- [x] **Task 8: Cleanup and build verification**
+  Remove any dead code from the migration: unused router imports, orphaned `useSessionStorage` hook if no longer used, unused navigation components or helper functions. Run `npm run build` and fix any TypeScript errors. Run `npx vitest run` and fix any test failures. Verify the full scroll flow works: Blueprints section → Battle section with unified combatant list and ⊕ button → Results section with pie chart. Confirm localStorage persistence still works for factions across page reloads.

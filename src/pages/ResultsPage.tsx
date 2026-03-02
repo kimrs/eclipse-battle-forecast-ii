@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Link } from 'react-router-dom';
 import type {
   Faction,
   FactionDeployment,
@@ -11,7 +10,7 @@ import type {
 import { ResultsChart } from '../components/ResultsChart';
 import { SimulationLog } from '../components/SimulationLog';
 
-interface BattleSetupData {
+export interface BattleSetupData {
   factionDeployments: FactionDeployment[];
   npcDeployments: NpcDeployment[];
   config: SimulationConfig;
@@ -34,18 +33,11 @@ function getFactionDisplayName(id: string, factions: Faction[]): string {
   return id;
 }
 
-function readSetupFromStorage(): BattleSetupData | null {
-  try {
-    const raw = sessionStorage.getItem('eclipse-battle-setup');
-    if (!raw) return null;
-    return JSON.parse(raw) as BattleSetupData;
-  } catch {
-    return null;
-  }
+interface ResultsSectionProps {
+  setup: BattleSetupData | null;
 }
 
-export function ResultsPage() {
-  const [setup] = useState<BattleSetupData | null>(() => readSetupFromStorage());
+export function ResultsSection({ setup }: ResultsSectionProps) {
   const [results, setResults] = useState<SimulationResults | null>(null);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -99,11 +91,11 @@ export function ResultsPage() {
     });
   }, [setup]);
 
-  // Run on mount
+  // Run when setup changes to a new non-null value
   useEffect(() => {
     if (setup) runSim();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [setup]);
 
   // Clean up worker on unmount
   useEffect(() => {
@@ -144,10 +136,6 @@ export function ResultsPage() {
     return { id, wins, winPct, avgDmg, avgSurvivors };
   });
 
-  // Compute draws from summary (accurate even with limited runs array)
-  const totalWins = results ? results.summary.reduce((sum, s) => sum + s.wins, 0) : 0;
-  const drawCount = totalRuns - totalWins;
-
   const sortedRows = [...tableRows].sort((a, b) => {
     const sign = sortDir === 'desc' ? -1 : 1;
     if (sortCol === 'wins') return sign * (a.wins - b.wins);
@@ -174,8 +162,9 @@ export function ResultsPage() {
   );
 
   return (
-    <div className="max-w-3xl mx-auto p-3 sm:p-4 space-y-4 sm:space-y-6">
-        {/* Page title */}
+    <section id="results" className="border-t border-gray-700 pt-6">
+      <div className="max-w-3xl mx-auto p-3 sm:p-4 space-y-4 sm:space-y-6">
+        {/* Section title */}
         <div className="flex items-center justify-between">
           <h2 className="text-xl sm:text-2xl font-bold">
             Results
@@ -185,21 +174,12 @@ export function ResultsPage() {
               </span>
             )}
           </h2>
-          <Link
-            to="/battle"
-            className="text-sm text-gray-400 hover:text-white transition-colors"
-          >
-            ← Back
-          </Link>
         </div>
 
         {/* No setup data */}
         {!setup && (
-          <div className="bg-yellow-900/40 border border-yellow-700 text-yellow-300 rounded-lg px-4 py-4 text-sm">
-            No battle setup found.{' '}
-            <Link to="/battle" className="underline hover:text-yellow-100">
-              Configure a battle first.
-            </Link>
+          <div className="bg-gray-800 border border-gray-700 rounded-xl p-6 text-center text-gray-400 text-sm">
+            Run a simulation to see results here.
           </div>
         )}
 
@@ -282,16 +262,6 @@ export function ResultsPage() {
                             </tr>
                           );
                         })}
-                        {/* Draw row */}
-                        <tr className={sortedRows.length % 2 === 0 ? 'bg-gray-800' : 'bg-gray-750'}>
-                          <td className="px-3 sm:px-4 py-2.5 text-yellow-400 font-medium">Draw</td>
-                          <td className="px-3 sm:px-4 py-2.5 text-gray-300">{drawCount}</td>
-                          <td className="px-3 sm:px-4 py-2.5 text-gray-300">
-                            {totalRuns > 0 ? ((drawCount / totalRuns) * 100).toFixed(1) : '0.0'}%
-                          </td>
-                          <td className="px-3 sm:px-4 py-2.5 text-gray-500">—</td>
-                          <td className="px-3 sm:px-4 py-2.5 text-gray-500">—</td>
-                        </tr>
                       </tbody>
                     </table>
                   </div>
@@ -304,7 +274,7 @@ export function ResultsPage() {
           </>
         )}
 
-        {/* Action buttons */}
+        {/* Re-run button */}
         {setup && (
           <div className="flex gap-3">
             <button
@@ -314,14 +284,9 @@ export function ResultsPage() {
             >
               Re-run
             </button>
-            <Link
-              to="/battle"
-              className="px-5 py-2.5 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-xl transition-colors text-sm"
-            >
-              Modify Setup
-            </Link>
           </div>
         )}
-    </div>
+      </div>
+    </section>
   );
 }

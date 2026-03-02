@@ -37,9 +37,9 @@ const DIE_BG: Record<DieColor, string> = {
 };
 
 function DieChip({ color, value }: { color: DieColor; value: DieValue }) {
-  const label = value === 'star' ? '\u2605' : value === 'blank' ? '\u00D8' : String(value);
+  const label = value === 'star' ? '\u2605' : value === 'blank' ? '' : String(value);
   return (
-    <span className={`inline-block text-[10px] leading-none px-1 py-0.5 rounded font-bold ${DIE_BG[color]}`}>
+    <span className={`inline-block text-[10px] leading-none px-1 py-0.5 rounded font-bold min-w-[1.2em] ${DIE_BG[color]}`}>
       {label}
     </span>
   );

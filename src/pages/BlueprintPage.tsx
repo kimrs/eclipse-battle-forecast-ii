@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { BlueprintEditor } from '../components/BlueprintEditor';
-import { useLocalStorage } from '../hooks/useLocalStorage';
 import { SPECIES_PRESETS } from '../data/species';
 import type { BlueprintPreset } from '../data/species';
 import { SHIP_PARTS } from '../data/shipParts';
@@ -24,7 +23,7 @@ function buildBlueprintFromPreset(shipType: ShipType, cfg: BlueprintPreset): Blu
   };
 }
 
-function makeDefaultFactions(): Faction[] {
+export function makeDefaultFactions(): Faction[] {
   return SPECIES_PRESETS.map(preset => ({
     id: crypto.randomUUID(),
     name: preset.name,
@@ -58,8 +57,12 @@ const SHIP_TYPE_LABELS: Record<ShipType, string> = {
   starbase: 'Starbase',
 };
 
-export function BlueprintPage() {
-  const [factions, setFactions] = useLocalStorage<Faction[]>('eclipse-factions', makeDefaultFactions());
+interface BlueprintSectionProps {
+  factions: Faction[];
+  onFactionsChange: (factions: Faction[]) => void;
+}
+
+export function BlueprintSection({ factions, onFactionsChange }: BlueprintSectionProps) {
   const [activeFactionId, setActiveFactionId] = useState<string>(
     () => factions[0]?.id ?? ''
   );
@@ -75,13 +78,13 @@ export function BlueprintPage() {
   const activeFaction = factions.find(f => f.id === activeFactionId) ?? factions[0];
 
   const updateFaction = (updated: Faction) => {
-    setFactions(factions.map(f => (f.id === updated.id ? updated : f)));
+    onFactionsChange(factions.map(f => (f.id === updated.id ? updated : f)));
   };
 
   const handleAddFaction = () => {
     if (!newFactionName.trim()) return;
     const faction = makeEmptyFaction(newFactionName.trim());
-    setFactions([...factions, faction]);
+    onFactionsChange([...factions, faction]);
     setActiveFactionId(faction.id);
     setNewFactionName('');
     setShowNewFactionInput(false);
@@ -90,7 +93,7 @@ export function BlueprintPage() {
   const handleDeleteFaction = (id: string) => {
     if (factions.length <= 1) return;
     const remaining = factions.filter(f => f.id !== id);
-    setFactions(remaining);
+    onFactionsChange(remaining);
     if (activeFactionId === id) {
       setActiveFactionId(remaining[0].id);
     }
@@ -144,7 +147,7 @@ export function BlueprintPage() {
   const activeBlueprint = activeFaction.blueprints[activeShipType];
 
   return (
-    <div>
+    <section id="blueprints" className="border-t border-gray-700 pt-6">
       <div className="max-w-4xl mx-auto p-4">
         {/* Faction Tabs */}
         <div className="flex items-center gap-2 mb-4 flex-wrap">
@@ -370,7 +373,7 @@ export function BlueprintPage() {
               <button
                 onClick={() => {
                   const defaults = makeDefaultFactions();
-                  setFactions(defaults);
+                  onFactionsChange(defaults);
                   setActiveFactionId(defaults[0].id);
                   setShowResetConfirm(false);
                 }}
@@ -387,6 +390,6 @@ export function BlueprintPage() {
       {showPresetDropdown && (
         <div className="fixed inset-0 z-0" onClick={() => setShowPresetDropdown(false)} />
       )}
-    </div>
+    </section>
   );
 }

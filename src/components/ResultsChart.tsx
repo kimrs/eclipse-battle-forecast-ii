@@ -8,7 +8,6 @@ interface ResultsChartProps {
 }
 
 const PALETTE = ['#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
-const DRAW_COLOR = '#6b7280';
 
 interface ChartEntry {
   label: string;
@@ -18,109 +17,101 @@ interface ChartEntry {
 }
 
 function buildChartData(results: SimulationResults, factions: Faction[]): ChartEntry[] {
-  const totalRuns = results.config.runs;
   const totalWins = results.summary.reduce((sum, s) => sum + s.wins, 0);
-  const drawCount = totalRuns - totalWins;
-  return [
-    ...factions.map((f, i) => {
-      const wins = results.summary.find(s => s.factionId === f.id)?.wins ?? 0;
-      return {
-        label: f.name,
-        wins,
-        pct: totalRuns > 0 ? wins / totalRuns : 0,
-        color: PALETTE[i % PALETTE.length],
-      };
-    }),
-    {
-      label: 'Draw',
-      wins: drawCount,
-      pct: totalRuns > 0 ? drawCount / totalRuns : 0,
-      color: DRAW_COLOR,
-    },
-  ];
+  return factions.map((f, i) => {
+    const wins = results.summary.find(s => s.factionId === f.id)?.wins ?? 0;
+    return {
+      label: f.name,
+      wins,
+      pct: totalWins > 0 ? wins / totalWins : 0,
+      color: PALETTE[i % PALETTE.length],
+    };
+  });
 }
 
-function drawChart(
+function drawPieChart(
+  container: HTMLDivElement,
   svg: SVGSVGElement,
-  containerWidth: number,
   chartData: ChartEntry[],
 ) {
-  const compact = containerWidth < 400;
-  const margin = {
-    top: 12,
-    right: compact ? 52 : 72,
-    bottom: 12,
-    left: compact ? 72 : 120,
-  };
-  const barHeight = 32;
-  const barGap = 10;
-  const height = chartData.length * (barHeight + barGap) + margin.top + margin.bottom;
+  const containerWidth = container.clientWidth || 400;
+  const diameter = Math.min(Math.max(containerWidth * 0.7, 200), 350);
+  const radius = diameter / 2;
+  const svgHeight = diameter + 16;
 
   d3.select(svg).selectAll('*').remove();
-  svg.setAttribute('viewBox', `0 0 ${containerWidth} ${height}`);
+  svg.setAttribute('viewBox', `0 0 ${containerWidth} ${svgHeight}`);
   svg.setAttribute('width', String(containerWidth));
-  svg.setAttribute('height', String(height));
+  svg.setAttribute('height', String(svgHeight));
 
-  const innerWidth = containerWidth - margin.left - margin.right;
-  const x = d3.scaleLinear().domain([0, 1]).range([0, innerWidth]);
+  // Ensure tooltip div exists inside container
+  let tooltip = d3.select(container).select<HTMLDivElement>('.pie-tooltip');
+  if (tooltip.empty()) {
+    tooltip = d3.select(container)
+      .append('div')
+      .attr('class', 'pie-tooltip')
+      .style('position', 'absolute')
+      .style('background', 'rgba(17,24,39,0.95)')
+      .style('color', '#f9fafb')
+      .style('padding', '6px 10px')
+      .style('border-radius', '6px')
+      .style('font-size', '12px')
+      .style('pointer-events', 'none')
+      .style('display', 'none')
+      .style('white-space', 'nowrap')
+      .style('z-index', '10');
+  }
+
   const g = d3.select(svg)
     .append('g')
-    .attr('transform', `translate(${margin.left},${margin.top})`);
+    .attr('transform', `translate(${containerWidth / 2}, ${radius + 8})`);
 
-  chartData.forEach((d, i) => {
-    const y = i * (barHeight + barGap);
+  const pie = d3.pie<ChartEntry>().value(d => d.wins).sort(null);
+  const arc = d3.arc<d3.PieArcDatum<ChartEntry>>()
+    .innerRadius(0)
+    .outerRadius(radius);
+  const arcHover = d3.arc<d3.PieArcDatum<ChartEntry>>()
+    .innerRadius(0)
+    .outerRadius(radius + 8);
 
-    // Row label
-    g.append('text')
-      .attr('x', -8)
-      .attr('y', y + barHeight / 2)
-      .attr('dy', '0.35em')
-      .attr('text-anchor', 'end')
-      .attr('fill', '#d1d5db')
-      .attr('font-size', compact ? '11' : '13')
-      .text(compact && d.label.length > 8 ? d.label.slice(0, 7) + '…' : d.label);
+  const arcs = pie(chartData);
 
-    // Background track
-    g.append('rect')
-      .attr('x', 0)
-      .attr('y', y)
-      .attr('width', innerWidth)
-      .attr('height', barHeight)
-      .attr('fill', '#374151')
-      .attr('rx', 4);
+  const paths = g.selectAll<SVGPathElement, d3.PieArcDatum<ChartEntry>>('path')
+    .data(arcs)
+    .join('path')
+    .attr('fill', d => d.data.color)
+    .attr('stroke', '#1f2937')
+    .attr('stroke-width', 2)
+    .attr('cursor', 'pointer');
 
-    // Value bar
-    const barWidth = Math.max(0, x(d.pct));
-    if (barWidth > 0) {
-      g.append('rect')
-        .attr('x', 0)
-        .attr('y', y)
-        .attr('width', barWidth)
-        .attr('height', barHeight)
-        .attr('fill', d.color)
-        .attr('rx', 4);
-    }
+  // Animate segments from 0
+  paths
+    .transition()
+    .duration(600)
+    .ease(d3.easeCubicOut)
+    .attrTween('d', function(d) {
+      const i = d3.interpolate({ startAngle: 0, endAngle: 0 }, d);
+      return (t: number) => arc(i(t) as d3.PieArcDatum<ChartEntry>) ?? '';
+    });
 
-    // Percentage label
-    g.append('text')
-      .attr('x', innerWidth + 6)
-      .attr('y', y + barHeight / 2)
-      .attr('dy', '0.35em')
-      .attr('fill', '#f9fafb')
-      .attr('font-size', compact ? '11' : '13')
-      .text(`${(d.pct * 100).toFixed(1)}%`);
-
-    // Hover tooltip overlay
-    g.append('rect')
-      .attr('x', 0)
-      .attr('y', y)
-      .attr('width', innerWidth)
-      .attr('height', barHeight)
-      .attr('fill', 'transparent')
-      .attr('cursor', 'default')
-      .append('title')
-      .text(`${d.label}: ${d.wins} wins (${(d.pct * 100).toFixed(1)}%)`);
-  });
+  // Hover interactions
+  paths
+    .on('mouseenter', function(_event, d) {
+      d3.select(this).attr('d', arcHover(d) ?? arc(d) ?? '');
+      tooltip
+        .style('display', 'block')
+        .text(`${d.data.label}: ${d.data.wins} wins (${(d.data.pct * 100).toFixed(1)}%)`);
+    })
+    .on('mousemove', function(event: MouseEvent) {
+      const rect = container.getBoundingClientRect();
+      tooltip
+        .style('left', `${event.clientX - rect.left + 12}px`)
+        .style('top', `${event.clientY - rect.top - 28}px`);
+    })
+    .on('mouseleave', function(_event, d) {
+      d3.select(this).attr('d', arc(d) ?? '');
+      tooltip.style('display', 'none');
+    });
 }
 
 export function ResultsChart({ results, factions }: ResultsChartProps) {
@@ -134,11 +125,7 @@ export function ResultsChart({ results, factions }: ResultsChartProps) {
     const container = containerRef.current;
     if (!svg || !container || totalRuns === 0) return;
 
-    const render = () => {
-      const width = container.clientWidth || 400;
-      drawChart(svg, width, chartData);
-    };
-
+    const render = () => drawPieChart(container, svg, chartData);
     render();
 
     const observer = new ResizeObserver(render);
@@ -152,9 +139,23 @@ export function ResultsChart({ results, factions }: ResultsChartProps) {
       {totalRuns === 0 ? (
         <p className="text-gray-400 text-sm">No simulation data available.</p>
       ) : (
-        <div ref={containerRef} className="w-full">
-          <svg ref={svgRef} className="w-full" />
-        </div>
+        <>
+          <div ref={containerRef} className="w-full relative">
+            <svg ref={svgRef} className="w-full" />
+          </div>
+          <div className="mt-4 flex flex-col gap-1">
+            {chartData.map((entry) => (
+              <div key={entry.label} className="flex items-center gap-2 text-sm">
+                <span
+                  className="inline-block w-3 h-3 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: entry.color }}
+                />
+                <span className="text-gray-200">{entry.label}</span>
+                <span className="text-gray-400 ml-auto">{(entry.pct * 100).toFixed(1)}%</span>
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

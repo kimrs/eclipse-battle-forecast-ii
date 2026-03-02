@@ -1,6 +1,3 @@
-import { useNavigate, Link } from 'react-router-dom';
-import { useLocalStorage } from '../hooks/useLocalStorage';
-import { useSessionStorage } from '../hooks/useSessionStorage';
 import { BattleSetup } from '../components/BattleSetup';
 import type {
   Faction,
@@ -78,36 +75,43 @@ function getValidationErrors(
   return errors;
 }
 
-export function BattlePage() {
-  const navigate = useNavigate();
-  const [factions] = useLocalStorage<Faction[]>('eclipse-factions', []);
-  const [factionDeployments, setFactionDeployments] = useSessionStorage<FactionDeployment[]>('eclipse-faction-deployments', []);
-  const [npcDeployments, setNpcDeployments] = useSessionStorage<NpcDeployment[]>('eclipse-npc-deployments', []);
-  const [config, setConfig] = useSessionStorage<SimulationConfig>('eclipse-sim-config', { runs: 1000, dicePool: 600 });
+interface BattleSectionProps {
+  factions: Faction[];
+  factionDeployments: FactionDeployment[];
+  npcDeployments: NpcDeployment[];
+  config: SimulationConfig;
+  onFactionDeploymentsChange: (d: FactionDeployment[]) => void;
+  onNpcDeploymentsChange: (d: NpcDeployment[]) => void;
+  onConfigChange: (updater: SimulationConfig | ((prev: SimulationConfig) => SimulationConfig)) => void;
+  onRunSimulation: () => void;
+}
 
+export function BattleSection({
+  factions,
+  factionDeployments,
+  npcDeployments,
+  config,
+  onFactionDeploymentsChange,
+  onNpcDeploymentsChange,
+  onConfigChange,
+  onRunSimulation,
+}: BattleSectionProps) {
   const errors = getValidationErrors(factionDeployments, npcDeployments, config, factions);
   const isValid = errors.length === 0;
 
   const handleRunSimulation = () => {
     if (!isValid) return;
-    const resolvedFactions = factionDeployments
-      .map(d => factions.find(f => f.id === d.factionId))
-      .filter((f): f is Faction => f !== undefined);
-
-    sessionStorage.setItem(
-      'eclipse-battle-setup',
-      JSON.stringify({ factionDeployments, npcDeployments, config, factions: resolvedFactions })
-    );
-    navigate('/results');
+    onRunSimulation();
   };
 
   return (
-    <div className="max-w-3xl mx-auto p-4 space-y-6">
+    <section id="battle" className="border-t border-gray-700 pt-6">
+      <div className="max-w-3xl mx-auto p-4 space-y-6">
         <h2 className="text-2xl font-bold">Battle Sector Setup</h2>
 
         {factions.length === 0 && (
           <div className="bg-yellow-900/40 border border-yellow-700 text-yellow-300 rounded-lg px-4 py-3 text-sm">
-            No factions configured. <Link to="/" className="underline hover:text-yellow-100">Go to Blueprints</Link> to set up factions first.
+            No factions configured. Go to Blueprints to set up factions first.
           </div>
         )}
 
@@ -115,8 +119,8 @@ export function BattlePage() {
           factionDeployments={factionDeployments}
           npcDeployments={npcDeployments}
           availableFactions={factions}
-          onFactionDeploymentsChange={setFactionDeployments}
-          onNpcDeploymentsChange={setNpcDeployments}
+          onFactionDeploymentsChange={onFactionDeploymentsChange}
+          onNpcDeploymentsChange={onNpcDeploymentsChange}
         />
 
         {/* Simulation Settings */}
@@ -130,7 +134,7 @@ export function BattlePage() {
                 min={1}
                 value={config.runs}
                 onChange={e =>
-                  setConfig(c => ({ ...c, runs: Math.max(1, parseInt(e.target.value, 10) || 1) }))
+                  onConfigChange(c => ({ ...c, runs: Math.max(1, parseInt(e.target.value, 10) || 1) }))
                 }
                 className="w-full bg-gray-700 border border-gray-600 text-white rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
@@ -146,7 +150,7 @@ export function BattlePage() {
                 step={6}
                 value={config.dicePool}
                 onChange={e =>
-                  setConfig(c => ({ ...c, dicePool: Math.max(6, parseInt(e.target.value, 10) || 6) }))
+                  onConfigChange(c => ({ ...c, dicePool: Math.max(6, parseInt(e.target.value, 10) || 6) }))
                 }
                 className="w-full bg-gray-700 border border-gray-600 text-white rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
@@ -179,6 +183,7 @@ export function BattlePage() {
             ▶ Run Simulation
           </button>
         </div>
-    </div>
+      </div>
+    </section>
   );
 }

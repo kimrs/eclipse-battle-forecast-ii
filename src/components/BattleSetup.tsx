@@ -1,4 +1,6 @@
+import { useState, useRef, useEffect } from 'react';
 import { FactionPanel } from './FactionPanel';
+import { NpcPanel } from './NpcPanel';
 import { NPC_BLUEPRINTS } from '../data/npcBlueprints';
 import type { FactionDeployment, NpcDeployment, NpcType, Faction } from '../types/game';
 
@@ -10,20 +12,20 @@ interface BattleSetupProps {
   onNpcDeploymentsChange: (deployments: NpcDeployment[]) => void;
 }
 
-const NPC_TYPES: NpcType[] = ['ancient', 'guardian', 'gcds'];
-const NPC_TYPE_LABELS: Record<NpcType, string> = {
-  ancient: 'Ancient',
-  guardian: 'Guardian',
-  gcds: 'GCDS',
+type NpcOption = {
+  label: string;
+  type: NpcType;
+  variant: 'normal' | 'advanced';
 };
 
-function makeDefaultNpc(): NpcDeployment {
-  return {
-    type: 'ancient',
-    blueprint: NPC_BLUEPRINTS['ancient'].normal,
-    count: 1,
-  };
-}
+const NPC_OPTIONS: NpcOption[] = [
+  { label: 'Ancient (Normal)', type: 'ancient', variant: 'normal' },
+  { label: 'Ancient (Advanced)', type: 'ancient', variant: 'advanced' },
+  { label: 'Guardian (Normal)', type: 'guardian', variant: 'normal' },
+  { label: 'Guardian (Advanced)', type: 'guardian', variant: 'advanced' },
+  { label: 'GCDS', type: 'gcds', variant: 'normal' },
+];
+
 
 export function BattleSetup({
   factionDeployments,
@@ -32,34 +34,26 @@ export function BattleSetup({
   onFactionDeploymentsChange,
   onNpcDeploymentsChange,
 }: BattleSetupProps) {
-  const handleAddFaction = () => {
-    if (availableFactions.length === 0) return;
-    const nextTurn = factionDeployments.length + 1;
-    const newDeployment: FactionDeployment = {
-      factionId: availableFactions[0].id,
-      ships: [
-        { type: 'interceptor', count: 0 },
-        { type: 'cruiser', count: 0 },
-        { type: 'dreadnought', count: 0 },
-        { type: 'starbase', count: 0 },
-      ],
-      turnOfEntry: nextTurn,
-      controlsSector: false,
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
     };
-    onFactionDeploymentsChange([...factionDeployments, newDeployment]);
-  };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [dropdownOpen]);
 
   const handleUpdateFaction = (index: number, updated: FactionDeployment) => {
-    const next = factionDeployments.map((d, i) => (i === index ? updated : d));
-    onFactionDeploymentsChange(next);
+    onFactionDeploymentsChange(factionDeployments.map((d, i) => (i === index ? updated : d)));
   };
 
   const handleRemoveFaction = (index: number) => {
     onFactionDeploymentsChange(factionDeployments.filter((_, i) => i !== index));
-  };
-
-  const handleAddNpc = () => {
-    onNpcDeploymentsChange([...npcDeployments, makeDefaultNpc()]);
   };
 
   const handleUpdateNpc = (index: number, updated: NpcDeployment) => {
@@ -70,131 +64,98 @@ export function BattleSetup({
     onNpcDeploymentsChange(npcDeployments.filter((_, i) => i !== index));
   };
 
-  const handleNpcTypeChange = (index: number, type: NpcType) => {
-    const blueprints = NPC_BLUEPRINTS[type];
-    handleUpdateNpc(index, {
-      ...npcDeployments[index],
-      type,
-      blueprint: blueprints.normal,
-    });
+  const handleAddFaction = (faction: Faction) => {
+    const newDeployment: FactionDeployment = {
+      factionId: faction.id,
+      ships: [
+        { type: 'interceptor', count: 0 },
+        { type: 'cruiser', count: 0 },
+        { type: 'dreadnought', count: 0 },
+        { type: 'starbase', count: 0 },
+      ],
+      turnOfEntry: factionDeployments.length + npcDeployments.length + 1,
+      controlsSector: false,
+    };
+    onFactionDeploymentsChange([...factionDeployments, newDeployment]);
+    setDropdownOpen(false);
   };
 
-  const handleNpcVariantChange = (index: number, variant: 'normal' | 'advanced') => {
-    const npc = npcDeployments[index];
-    const blueprints = NPC_BLUEPRINTS[npc.type];
-    const blueprint = variant === 'advanced' && blueprints.advanced
-      ? blueprints.advanced
-      : blueprints.normal;
-    handleUpdateNpc(index, { ...npc, blueprint });
-  };
-
-  const getNpcVariant = (npc: NpcDeployment): 'normal' | 'advanced' => {
-    const blueprints = NPC_BLUEPRINTS[npc.type];
-    return blueprints.advanced && npc.blueprint === blueprints.advanced ? 'advanced' : 'normal';
+  const handleAddNpc = (option: NpcOption) => {
+    const blueprints = NPC_BLUEPRINTS[option.type];
+    const blueprint =
+      option.variant === 'advanced' && blueprints.advanced
+        ? blueprints.advanced
+        : blueprints.normal;
+    const turnOfEntry = factionDeployments.length + npcDeployments.length + 1;
+    onNpcDeploymentsChange([...npcDeployments, { type: option.type, blueprint, count: 1, turnOfEntry }]);
+    setDropdownOpen(false);
   };
 
   return (
-    <div className="space-y-6">
-      {/* Faction Panels */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold text-white">Factions in Battle:</h2>
+    <div className="space-y-3">
+      {/* Unified combatant list: faction cards first, then NPC cards */}
+      {factionDeployments.map((deployment, i) => (
+        <FactionPanel
+          key={`faction-${i}`}
+          deployment={deployment}
+          availableFactions={availableFactions}
+          onChange={updated => handleUpdateFaction(i, updated)}
+          onRemove={() => handleRemoveFaction(i)}
+        />
+      ))}
+      {npcDeployments.map((npc, i) => (
+        <NpcPanel
+          key={`npc-${i}`}
+          npc={npc}
+          onUpdate={updated => handleUpdateNpc(i, updated)}
+          onRemove={() => handleRemoveNpc(i)}
+        />
+      ))}
+
+      {/* ⊕ Add combatant button */}
+      <div className="flex justify-center pt-2">
+        <div className="relative" ref={dropdownRef}>
           <button
-            onClick={handleAddFaction}
-            disabled={availableFactions.length === 0}
-            className="text-sm px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+            onClick={() => setDropdownOpen(prev => !prev)}
+            aria-label="Add combatant"
+            className="w-11 h-11 flex items-center justify-center rounded-full border-2 border-gray-500 text-gray-400 hover:border-blue-400 hover:text-blue-400 text-xl transition-colors"
           >
-            + Add Faction
+            ⊕
           </button>
-        </div>
-
-        {factionDeployments.length === 0 ? (
-          <p className="text-gray-500 text-sm italic">No factions added yet.</p>
-        ) : (
-          <div className="space-y-3">
-            {factionDeployments.map((deployment, i) => (
-              <FactionPanel
-                key={i}
-                deployment={deployment}
-                availableFactions={availableFactions}
-                onChange={updated => handleUpdateFaction(i, updated)}
-                onRemove={() => handleRemoveFaction(i)}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* NPC Panels */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold text-white">NPC Opponents:</h2>
-          <button
-            onClick={handleAddNpc}
-            className="text-sm px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
-          >
-            + Add NPC
-          </button>
-        </div>
-
-        {npcDeployments.length === 0 ? (
-          <p className="text-gray-500 text-sm italic">No NPC opponents added.</p>
-        ) : (
-          <div className="space-y-3">
-            {npcDeployments.map((npc, i) => {
-              const hasAdvanced = !!NPC_BLUEPRINTS[npc.type].advanced;
-              const currentVariant = getNpcVariant(npc);
-              return (
-                <div key={i} className="bg-gray-800 border border-purple-800 rounded-xl shadow p-4">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <div className="flex items-center gap-2">
-                        <label className="text-sm text-gray-400">Type:</label>
-                        <select
-                          value={npc.type}
-                          onChange={e => handleNpcTypeChange(i, e.target.value as NpcType)}
-                          className="bg-gray-700 border border-gray-600 text-white rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
-                        >
-                          {NPC_TYPES.map(t => (
-                            <option key={t} value={t}>{NPC_TYPE_LABELS[t]}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <label className="text-sm text-gray-400">Variant:</label>
-                        <select
-                          value={currentVariant}
-                          onChange={e => handleNpcVariantChange(i, e.target.value as 'normal' | 'advanced')}
-                          disabled={!hasAdvanced}
-                          className="bg-gray-700 border border-gray-600 text-white rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 disabled:opacity-50"
-                        >
-                          <option value="normal">Normal</option>
-                          {hasAdvanced && <option value="advanced">Advanced</option>}
-                        </select>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <label className="text-sm text-gray-400">Count:</label>
-                        <input
-                          type="number"
-                          min={1}
-                          value={npc.count}
-                          onChange={e => handleUpdateNpc(i, { ...npc, count: Math.max(1, parseInt(e.target.value, 10) || 1) })}
-                          className="w-16 bg-gray-700 border border-gray-600 text-white rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
-                        />
-                      </div>
-                    </div>
+          {dropdownOpen && (
+            <div className="absolute left-1/2 -translate-x-1/2 top-12 z-10 bg-gray-800 border border-gray-600 rounded-xl shadow-xl min-w-[12rem] py-2">
+              {availableFactions.length > 0 ? (
+                <>
+                  <p className="px-3 py-1 text-xs text-gray-500 uppercase tracking-wider">
+                    Factions
+                  </p>
+                  {availableFactions.map(f => (
                     <button
-                      onClick={() => handleRemoveNpc(i)}
-                      className="text-sm text-red-400 hover:text-red-300 border border-red-800 rounded px-2 py-1 transition-colors"
+                      key={f.id}
+                      onClick={() => handleAddFaction(f)}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 transition-colors"
                     >
-                      ✕ Remove
+                      {f.name}
                     </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                  ))}
+                  <div className="border-t border-gray-700 my-1" />
+                </>
+              ) : (
+                <p className="px-4 py-2 text-xs text-gray-500 italic">No factions configured</p>
+              )}
+              <p className="px-3 py-1 text-xs text-gray-500 uppercase tracking-wider">NPCs</p>
+              {NPC_OPTIONS.map(opt => (
+                <button
+                  key={`${opt.type}-${opt.variant}`}
+                  onClick={() => handleAddNpc(opt)}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 transition-colors"
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -81,8 +81,8 @@ describe('resolveBattlePair', () => {
     // A fires first (higher initiative): HIT kills D; D never fires
     const engine = makeFixedEngine({ yellow: [HIT] });
     const result = resolveBattlePair(
-      { id: 'A', factionId: 'A', ships: aShips },
-      { id: 'D', factionId: 'D', ships: dShips },
+      { factionId: 'A', ships: aShips },
+      { factionId: 'D', ships: dShips },
       engine,
       false,
     );
@@ -99,8 +99,8 @@ describe('resolveBattlePair', () => {
     // Same initiative=0: Defender fires first (D fires HIT, A dies, A never fires)
     const engine = makeFixedEngine({ yellow: [HIT, MISS] });
     const result = resolveBattlePair(
-      { id: 'A', factionId: 'A', ships: aShips },
-      { id: 'D', factionId: 'D', ships: dShips },
+      { factionId: 'A', ships: aShips },
+      { factionId: 'D', ships: dShips },
       engine,
       false,
     );
@@ -122,8 +122,8 @@ describe('resolveBattlePair', () => {
 
     const engine = makeFixedEngine({ yellow: [HIT] });
     const result = resolveBattlePair(
-      { id: 'A', factionId: 'A', ships: aShips },
-      { id: 'D', factionId: 'D', ships: dShips },
+      { factionId: 'A', ships: aShips },
+      { factionId: 'D', ships: dShips },
       engine,
       false,
     );
@@ -140,8 +140,8 @@ describe('resolveBattlePair', () => {
     // Both missiles miss
     const engine = makeFixedEngine({ yellow: [MISS, MISS] });
     const result = resolveBattlePair(
-      { id: 'A', factionId: 'A', ships: aShips },
-      { id: 'D', factionId: 'D', ships: dShips },
+      { factionId: 'A', ships: aShips },
+      { factionId: 'D', ships: dShips },
       engine,
       false,
     );
@@ -162,8 +162,8 @@ describe('resolveBattlePair', () => {
     // Engagement: D is dead, no engagement
     const engine = makeFixedEngine({ yellow: [HIT] }); // A's missile hits
     const result = resolveBattlePair(
-      { id: 'A', factionId: 'A', ships: aShips },
-      { id: 'D', factionId: 'D', ships: dShips },
+      { factionId: 'A', ships: aShips },
+      { factionId: 'D', ships: dShips },
       engine,
       false,
     );
@@ -178,8 +178,8 @@ describe('resolveBattlePair', () => {
 
     const engine = makeFixedEngine({});
     const result = resolveBattlePair(
-      { id: 'A', factionId: 'A', ships: aShips },
-      { id: 'D', factionId: 'D', ships: dShips },
+      { factionId: 'A', ships: aShips },
+      { factionId: 'D', ships: dShips },
       engine,
       false,
     );

@@ -1,4 +1,6 @@
 import type { FactionDeployment, Faction, ShipType } from '../types/game';
+import { SHIP_TYPES, SHIP_TYPE_MAX, SHIP_TYPE_LABELS } from '../data/constants';
+import { Stepper } from './Stepper';
 
 interface FactionPanelProps {
   deployment: FactionDeployment;
@@ -6,22 +8,6 @@ interface FactionPanelProps {
   onChange: (updated: FactionDeployment) => void;
   onRemove: () => void;
 }
-
-const SHIP_TYPE_MAX: Record<ShipType, number> = {
-  interceptor: 8,
-  cruiser: 4,
-  dreadnought: 2,
-  starbase: 4,
-};
-
-const SHIP_TYPES: ShipType[] = ['interceptor', 'cruiser', 'dreadnought', 'starbase'];
-
-const SHIP_TYPE_LABELS: Record<ShipType, string> = {
-  interceptor: 'Interceptors',
-  cruiser: 'Cruisers',
-  dreadnought: 'Dreadnoughts',
-  starbase: 'Starbases',
-};
 
 export function FactionPanel({ deployment, availableFactions, onChange, onRemove }: FactionPanelProps) {
   const getShipCount = (type: ShipType) =>
@@ -61,32 +47,29 @@ export function FactionPanel({ deployment, availableFactions, onChange, onRemove
 
       <div className="mb-3">
         <p className="text-sm text-gray-400 mb-2">Ships:</p>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="flex flex-col gap-2">
           {SHIP_TYPES.map(type => (
-            <div key={type} className="flex items-center gap-2">
-              <label className="text-sm text-gray-300 w-28">{SHIP_TYPE_LABELS[type]}:</label>
-              <input
-                type="number"
+            <div key={type} className="flex items-center justify-between">
+              <label className="text-sm text-gray-300">{SHIP_TYPE_LABELS[type].plural}:</label>
+              <Stepper
+                value={getShipCount(type)}
                 min={0}
                 max={SHIP_TYPE_MAX[type]}
-                value={getShipCount(type)}
-                onChange={e => setShipCount(type, parseInt(e.target.value, 10) || 0)}
-                className="w-16 bg-gray-700 border border-gray-600 text-white rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                onChange={v => setShipCount(type, v)}
               />
             </div>
           ))}
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+        <div className="flex items-center justify-between sm:justify-start sm:gap-2">
           <label className="text-sm text-gray-400">Turn of Entry:</label>
-          <input
-            type="number"
-            min={1}
+          <Stepper
             value={deployment.turnOfEntry}
-            onChange={e => onChange({ ...deployment, turnOfEntry: Math.max(1, parseInt(e.target.value, 10) || 1) })}
-            className="w-16 bg-gray-700 border border-gray-600 text-white rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            min={1}
+            max={9}
+            onChange={v => onChange({ ...deployment, turnOfEntry: v })}
           />
         </div>
         <label className="flex items-center gap-2 cursor-pointer">
@@ -96,7 +79,7 @@ export function FactionPanel({ deployment, availableFactions, onChange, onRemove
             onChange={e => onChange({ ...deployment, controlsSector: e.target.checked })}
             className="w-4 h-4 accent-blue-500"
           />
-          <span className="text-sm text-gray-300">Controls Sector (Defender)</span>
+          <span className="text-sm text-gray-300"><span className="sm:hidden">Defender</span><span className="hidden sm:inline">Controls Sector (Defender)</span></span>
         </label>
       </div>
     </div>

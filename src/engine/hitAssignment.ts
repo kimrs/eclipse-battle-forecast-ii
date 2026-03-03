@@ -1,11 +1,11 @@
 import type { BattleShip, DieValue } from '../types/game';
-import { computeBlueprintStats } from '../types/game';
 
 export interface HitResult {
   damage: number;
   isAntimatter: boolean;
   selfDamage: number;    // Rift backfire damage (0 for non-Rift dice)
   isRift: boolean;       // true for Rift Cannon dice
+  eligibleTargetIds?: Set<string>;  // when present, only these targets can receive this hit
 }
 
 export interface DamageAssignment {
@@ -43,8 +43,8 @@ function isHitAgainstTarget(
 }
 
 /**
- * Assign pre-determined hits optimally across enemy ships.
- * All hits passed in are assumed valid against all enemies (shield check already performed).
+ * Assign hits optimally across enemy ships.
+ * Hits with eligibleTargetIds are only assigned to those targets; others hit any enemy.
  * Player strategy: destroy smallest ships first (maximize kills).
  * NPC strategy: destroy largest ships first.
  */
@@ -80,7 +80,9 @@ export function assignHitsOptimally(
     const currentHull = hull.get(enemy.id)!;
     const needed = currentHull + 1; // damage needed to destroy
 
-    const available = regular.filter(h => !h.used).sort((a, b) => b.damage - a.damage);
+    const available = regular
+      .filter(h => !h.used && (!h.eligibleTargetIds || h.eligibleTargetIds.has(enemy.id)))
+      .sort((a, b) => b.damage - a.damage);
     const totalRegular = available.reduce((s, h) => s + h.damage, 0);
 
     if (totalRegular + antimatterPool < needed) {
@@ -120,7 +122,17 @@ export function assignHitsOptimally(
       hull.get(e.id)! > hull.get(max.id)! ? e : max,
     );
     for (const h of regular.filter(h => !h.used)) {
-      assignments.push({ targetShipId: largest.id, damage: h.damage });
+      if (!h.eligibleTargetIds || h.eligibleTargetIds.has(largest.id)) {
+        assignments.push({ targetShipId: largest.id, damage: h.damage });
+      } else {
+        // Find any eligible survivor
+        for (const enemy of alive) {
+          if (h.eligibleTargetIds.has(enemy.id)) {
+            assignments.push({ targetShipId: enemy.id, damage: h.damage });
+            break;
+          }
+        }
+      }
       h.used = true;
     }
     if (antimatterPool > 0) {
@@ -199,21 +211,13 @@ export function resolveHits(
     };
   }
 
-  // Compute shields per enemy from their blueprint
+  // Use pre-computed shields from BattleShip stats
   const enemyShields = new Map<string, number>(
-    enemies.map(e => [e.id, computeBlueprintStats(e.blueprint).shields]),
+    enemies.map(e => [e.id, e.stats.shields]),
   );
 
-  // Each processable die tracks which enemies it can hit
-  interface ProcessedDie {
-    damage: number;
-    isAntimatter: boolean;
-    isRift: boolean;
-    eligibleIds: Set<string>;
-    used: boolean;
-  }
-
-  const processed: ProcessedDie[] = [];
+  // Build HitResult[] with per-target eligibility for assignHitsOptimally
+  const hits: HitResult[] = [];
 
   for (const die of dieResults) {
     if (die.faceValue === 'blank') continue;
@@ -221,125 +225,38 @@ export function resolveHits(
     if (die.isRift) {
       // Rift: only star faces are hits; they bypass all shields
       if (die.faceValue === 'star') {
-        processed.push({
+        hits.push({
           damage: die.damage,
           isAntimatter: die.isAntimatter,
+          selfDamage: die.selfDamage,
           isRift: true,
-          eligibleIds: new Set(enemies.map(e => e.id)),
-          used: false,
+          // No eligibleTargetIds — Rift hits bypass shields, eligible against all
         });
         totalSelfDamage += die.selfDamage;
       }
     } else {
-      // Standard die: determine per-target eligibility
-      const eligibleIds = new Set<string>();
+      // Standard die: determine per-target eligibility based on shields
+      const eligibleTargetIds = new Set<string>();
       for (const enemy of enemies) {
         const shields = enemyShields.get(enemy.id)!;
         if (isHitAgainstTarget(die.faceValue, die.attackerComputers, shields)) {
-          eligibleIds.add(enemy.id);
+          eligibleTargetIds.add(enemy.id);
         }
       }
-      if (eligibleIds.size > 0) {
-        processed.push({
+      if (eligibleTargetIds.size > 0) {
+        hits.push({
           damage: die.damage,
           isAntimatter: die.isAntimatter,
+          selfDamage: 0,
           isRift: false,
-          eligibleIds,
-          used: false,
+          eligibleTargetIds,
         });
       }
     }
   }
 
-  // Run greedy assignment with per-target eligibility
-  const assignments: DamageAssignment[] = [];
-  const hull = new Map<string, number>(enemies.map(e => [e.id, e.currentHull]));
-
-  // Pool antimatter damage
-  let antimatterPool = 0;
-  const regularDice = processed.filter(d => !d.isAntimatter);
-  for (const d of processed.filter(d => d.isAntimatter)) {
-    antimatterPool += d.damage;
-    d.used = true;
-  }
-
-  // Sort enemies for assignment
-  const sortedEnemies = [...enemies].sort((a, b) => {
-    const ha = hull.get(a.id)!;
-    const hb = hull.get(b.id)!;
-    return isNpc ? hb - ha : ha - hb;
-  });
-
-  for (const enemy of sortedEnemies) {
-    const currentHull = hull.get(enemy.id)!;
-    const needed = currentHull + 1;
-
-    // Available dice that can hit this enemy
-    const eligible = regularDice
-      .filter(d => !d.used && d.eligibleIds.has(enemy.id))
-      .sort((a, b) => b.damage - a.damage);
-
-    const totalEligible = eligible.reduce((s, d) => s + d.damage, 0);
-
-    if (totalEligible + antimatterPool < needed) {
-      continue; // Can't destroy this enemy
-    }
-
-    let accumulated = 0;
-    const toAssign: ProcessedDie[] = [];
-    for (const d of eligible) {
-      if (accumulated >= needed) break;
-      toAssign.push(d);
-      accumulated += d.damage;
-    }
-
-    let antimatterUsed = 0;
-    if (accumulated < needed) {
-      antimatterUsed = needed - accumulated;
-    }
-
-    for (const d of toAssign) {
-      d.used = true;
-      assignments.push({ targetShipId: enemy.id, damage: d.damage });
-    }
-    if (antimatterUsed > 0) {
-      antimatterPool -= antimatterUsed;
-      assignments.push({ targetShipId: enemy.id, damage: antimatterUsed });
-    }
-    hull.set(enemy.id, -1);
-  }
-
-  // Dump remaining hits on surviving enemies
-  const alive = enemies.filter(e => hull.get(e.id)! >= 0);
-  if (alive.length > 0) {
-    // Find largest surviving enemy
-    const largest = alive.reduce((max, e) =>
-      hull.get(e.id)! > hull.get(max.id)! ? e : max,
-    );
-
-    for (const d of regularDice.filter(d => !d.used)) {
-      // Dump on largest if eligible, otherwise find any eligible survivor
-      if (d.eligibleIds.has(largest.id)) {
-        assignments.push({ targetShipId: largest.id, damage: d.damage });
-        d.used = true;
-      } else {
-        for (const enemy of alive) {
-          if (d.eligibleIds.has(enemy.id)) {
-            assignments.push({ targetShipId: enemy.id, damage: d.damage });
-            d.used = true;
-            break;
-          }
-        }
-      }
-    }
-
-    if (antimatterPool > 0) {
-      assignments.push({ targetShipId: largest.id, damage: antimatterPool });
-    }
-  }
-
   return {
-    enemyDamage: assignments,
+    enemyDamage: assignHitsOptimally(hits, enemies, isNpc),
     backfireDamage: assignBackfireDamage(totalSelfDamage, ownRiftShips),
   };
 }

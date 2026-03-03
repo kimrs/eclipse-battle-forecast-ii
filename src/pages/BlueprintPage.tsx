@@ -1,13 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { BlueprintEditor } from '../components/BlueprintEditor';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { SPECIES_PRESETS } from '../data/species';
 import type { BlueprintPreset } from '../data/species';
-import { SHIP_PARTS } from '../data/shipParts';
+import { SHIP_TYPES, SHIP_TYPE_LABELS, PART_BY_ID } from '../data/constants';
 import type { Faction, ShipType, Blueprint } from '../types/game';
-
-const SHIP_TYPES: ShipType[] = ['interceptor', 'cruiser', 'dreadnought', 'starbase'];
-
-const PART_BY_ID = Object.fromEntries(SHIP_PARTS.map(p => [p.id, p]));
 
 function buildBlueprintFromPreset(shipType: ShipType, cfg: BlueprintPreset): Blueprint {
   return {
@@ -15,11 +12,11 @@ function buildBlueprintFromPreset(shipType: ShipType, cfg: BlueprintPreset): Blu
     initiativeBonus: cfg.initiativeBonus,
     slots: cfg.slots,
     parts: cfg.defaultParts.map(id => PART_BY_ID[id]).filter(Boolean),
-    ...(cfg.innateComputers && { innateComputers: cfg.innateComputers }),
-    ...(cfg.innateShields && { innateShields: cfg.innateShields }),
-    ...(cfg.innateHull && { innateHull: cfg.innateHull }),
-    ...(cfg.innateInitiative && { innateInitiative: cfg.innateInitiative }),
-    ...(cfg.innateEnergyProduction && { innateEnergyProduction: cfg.innateEnergyProduction }),
+    ...(cfg.innateComputers != null && { innateComputers: cfg.innateComputers }),
+    ...(cfg.innateShields != null && { innateShields: cfg.innateShields }),
+    ...(cfg.innateHull != null && { innateHull: cfg.innateHull }),
+    ...(cfg.innateInitiative != null && { innateInitiative: cfg.innateInitiative }),
+    ...(cfg.innateEnergyProduction != null && { innateEnergyProduction: cfg.innateEnergyProduction }),
   };
 }
 
@@ -45,17 +42,11 @@ function makeEmptyFaction(name: string): Faction {
     id: crypto.randomUUID(),
     name,
     blueprints: Object.fromEntries(
-      SHIP_TYPES.map(st => [st, { shipType: st, ...DEFAULT_SHIP_PROPS[st], parts: [] }]),
-    ) as unknown as Faction['blueprints'],
+      SHIP_TYPES.map(st => [st, { shipType: st, ...DEFAULT_SHIP_PROPS[st], parts: [] } as Blueprint]),
+    ) as Faction['blueprints'],
   };
 }
 
-const SHIP_TYPE_LABELS: Record<ShipType, string> = {
-  interceptor: 'Interceptor',
-  cruiser: 'Cruiser',
-  dreadnought: 'Dreadnought',
-  starbase: 'Starbase',
-};
 
 interface BlueprintSectionProps {
   factions: Faction[];
@@ -74,6 +65,18 @@ export function BlueprintSection({ factions, onFactionsChange }: BlueprintSectio
   const [newFactionName, setNewFactionName] = useState('');
   const [showNewFactionInput, setShowNewFactionInput] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const presetDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showPresetDropdown) return;
+    const handler = (e: MouseEvent) => {
+      if (presetDropdownRef.current && !presetDropdownRef.current.contains(e.target as Node)) {
+        setShowPresetDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showPresetDropdown]);
 
   const activeFaction = factions.find(f => f.id === activeFactionId) ?? factions[0];
 
@@ -150,21 +153,23 @@ export function BlueprintSection({ factions, onFactionsChange }: BlueprintSectio
     <section id="blueprints" className="border-t border-gray-700 pt-6">
       <div className="max-w-4xl mx-auto p-4">
         {/* Faction Tabs */}
-        <div className="flex items-center gap-2 mb-4 flex-wrap">
-          <div className="flex gap-2 flex-wrap">
-            {factions.map(faction => (
-              <button
-                key={faction.id}
-                onClick={() => setActiveFactionId(faction.id)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  faction.id === activeFactionId
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                }`}
-              >
-                {faction.name}
-              </button>
-            ))}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-4">
+          <div className="relative">
+            <div className="overflow-x-auto flex flex-nowrap gap-2 snap-x snap-mandatory scrollbar-hide pb-1 [mask-image:linear-gradient(to_right,transparent,black_1rem,black_calc(100%-1rem),transparent)] sm:[mask-image:none]">
+              {factions.map(faction => (
+                <button
+                  key={faction.id}
+                  onClick={() => setActiveFactionId(faction.id)}
+                  className={`snap-start shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    faction.id === activeFactionId
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  {faction.name}
+                </button>
+              ))}
+            </div>
           </div>
 
           {showNewFactionInput ? (
@@ -242,7 +247,7 @@ export function BlueprintSection({ factions, onFactionsChange }: BlueprintSectio
               Delete
             </button>
 
-            <div className="relative ml-auto">
+            <div className="relative ml-auto" ref={presetDropdownRef}>
               <button
                 onClick={() => setShowPresetDropdown(v => !v)}
                 className="text-xs border border-gray-600 text-gray-300 hover:text-white hover:border-gray-400 rounded px-2 py-0.5 transition-colors"
@@ -287,20 +292,21 @@ export function BlueprintSection({ factions, onFactionsChange }: BlueprintSectio
               <button
                 key={type}
                 onClick={() => setActiveShipType(type)}
-                className={`px-3 py-2 text-sm font-medium rounded-t-lg transition-colors -mb-px border border-transparent ${
+                className={`px-3 min-h-[44px] py-2 text-sm font-medium rounded-t-lg transition-colors -mb-px border border-transparent ${
                   type === activeShipType
                     ? 'bg-white text-gray-900 border-gray-300 border-b-white'
                     : 'text-gray-400 hover:text-white hover:bg-gray-700'
                 }`}
               >
-                {SHIP_TYPE_LABELS[type]}
+                <span className="sm:hidden">{SHIP_TYPE_LABELS[type].abbreviated}</span>
+                <span className="hidden sm:inline">{SHIP_TYPE_LABELS[type].singular}</span>
               </button>
             ))}
           </div>
 
           {/* Blueprint Editor */}
           <div className="mt-4 bg-white rounded-lg p-4">
-            <h3 className="text-gray-700 font-semibold mb-3">Blueprint: {SHIP_TYPE_LABELS[activeShipType]}</h3>
+            <h3 className="text-gray-700 font-semibold mb-3">Blueprint: {SHIP_TYPE_LABELS[activeShipType].singular}</h3>
             <BlueprintEditor
               blueprint={activeBlueprint}
               onChange={handleBlueprintChange}
@@ -308,88 +314,45 @@ export function BlueprintSection({ factions, onFactionsChange }: BlueprintSectio
           </div>
         </div>
 
-        {/* Save / Reset */}
-        <div className="flex justify-end gap-2">
+        {/* Reset */}
+        <div className="flex justify-end">
           <button
             onClick={() => setShowResetConfirm(true)}
             className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg text-sm font-medium transition-colors"
           >
             Reset to Defaults
           </button>
-          <button
-            onClick={() => {
-              const key = 'eclipse-factions';
-              window.localStorage.setItem(key, JSON.stringify(factions));
-              alert('Factions saved to browser!');
-            }}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
-          >
-            Save to Browser
-          </button>
         </div>
       </div>
 
       {/* Preset Confirmation Modal */}
       {pendingPreset && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-white text-gray-900 rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
-            <h2 className="font-bold text-lg mb-2">Load Preset</h2>
-            <p className="text-gray-600 text-sm mb-4">
-              This will replace all blueprints for &ldquo;{activeFaction.name}&rdquo;. Continue?
-            </p>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setPendingPreset(null)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-100"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmPreset}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
-              >
-                Load
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          title="Load Preset"
+          message={`This will replace all blueprints for \u201c${activeFaction.name}\u201d. Continue?`}
+          confirmLabel="Load"
+          onConfirm={handleConfirmPreset}
+          onCancel={() => setPendingPreset(null)}
+        />
       )}
 
       {/* Reset Confirmation Modal */}
       {showResetConfirm && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-white text-gray-900 rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
-            <h2 className="font-bold text-lg mb-2">Reset to Defaults</h2>
-            <p className="text-gray-600 text-sm mb-4">
-              This will replace all factions and blueprints with the defaults. Any customizations will be lost. Continue?
-            </p>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setShowResetConfirm(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-100"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  const defaults = makeDefaultFactions();
-                  onFactionsChange(defaults);
-                  setActiveFactionId(defaults[0].id);
-                  setShowResetConfirm(false);
-                }}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700"
-              >
-                Reset
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          title="Reset to Defaults"
+          message="This will replace all factions and blueprints with the defaults. Any customizations will be lost. Continue?"
+          confirmLabel="Reset"
+          confirmClass="bg-red-600 hover:bg-red-700"
+          onConfirm={() => {
+            const defaults = makeDefaultFactions();
+            onFactionsChange(defaults);
+            setActiveFactionId(defaults[0].id);
+            setShowResetConfirm(false);
+          }}
+          onCancel={() => setShowResetConfirm(false)}
+        />
       )}
 
-      {/* Backdrop for preset dropdown */}
-      {showPresetDropdown && (
-        <div className="fixed inset-0 z-0" onClick={() => setShowPresetDropdown(false)} />
-      )}
     </section>
   );
 }

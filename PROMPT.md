@@ -2,7 +2,7 @@
 
 Implement one task from the implementation plan.
 
-study /spec/\*.md and especially take a look at specs/mobile-first-redesign.md which we will use for this rewrite
+study /spec/\*.md and especially take a look at specs/cleanup.md and specs/ui-mobile.md
 
 ## Input
 

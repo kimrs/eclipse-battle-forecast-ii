@@ -1,4 +1,4 @@
-import type { Blueprint, ShipType } from '../types/game';
+import type { ShipType } from '../types/game';
 
 export interface InitiativeEntry {
   factionId: string;
@@ -7,15 +7,11 @@ export interface InitiativeEntry {
   isDefender: boolean;
 }
 
-function computeInitiative(blueprint: Blueprint): number {
-  return blueprint.initiativeBonus + blueprint.parts.reduce((sum, p) => sum + p.initiative, 0);
-}
-
 export function resolveInitiativeOrder(
   attackerFactionId: string,
   defenderFactionId: string,
-  attackerBlueprints: Record<ShipType, Blueprint>,
-  defenderBlueprints: Record<ShipType, Blueprint>,
+  attackerInitiatives: Record<ShipType, number>,
+  defenderInitiatives: Record<ShipType, number>,
   attackerShipTypes: ShipType[],
   defenderShipTypes: ShipType[],
 ): InitiativeEntry[] {
@@ -25,7 +21,7 @@ export function resolveInitiativeOrder(
     entries.push({
       factionId: attackerFactionId,
       shipType,
-      initiative: computeInitiative(attackerBlueprints[shipType]),
+      initiative: attackerInitiatives[shipType],
       isDefender: false,
     });
   }
@@ -34,7 +30,7 @@ export function resolveInitiativeOrder(
     entries.push({
       factionId: defenderFactionId,
       shipType,
-      initiative: computeInitiative(defenderBlueprints[shipType]),
+      initiative: defenderInitiatives[shipType],
       isDefender: true,
     });
   }

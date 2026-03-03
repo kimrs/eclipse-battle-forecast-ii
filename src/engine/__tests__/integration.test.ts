@@ -58,8 +58,8 @@ describe('Integration: 2-player interceptor battle', () => {
 
     const setup: SectorSetup = {
       factions: [
-        { factionId: 'faction-a', ships: [{ type: 'interceptor' as ShipType, count: 3 }], turnOfEntry: 1, controlsSector: false },
-        { factionId: 'faction-b', ships: [{ type: 'interceptor' as ShipType, count: 3 }], turnOfEntry: 2, controlsSector: true },
+        { id: 'faction-a', factionId: 'faction-a', ships: [{ type: 'interceptor' as ShipType, count: 3 }], turnOfEntry: 1, controlsSector: false },
+        { id: 'faction-b', factionId: 'faction-b', ships: [{ type: 'interceptor' as ShipType, count: 3 }], turnOfEntry: 2, controlsSector: true },
       ],
       npcs: [],
     };
@@ -109,8 +109,8 @@ describe('Integration: cruiser vs cruiser', () => {
 
     const setup: SectorSetup = {
       factions: [
-        { factionId: 'faction-a', ships: [{ type: 'cruiser' as ShipType, count: 2 }], turnOfEntry: 1, controlsSector: false },
-        { factionId: 'faction-b', ships: [{ type: 'cruiser' as ShipType, count: 2 }], turnOfEntry: 2, controlsSector: true },
+        { id: 'faction-a', factionId: 'faction-a', ships: [{ type: 'cruiser' as ShipType, count: 2 }], turnOfEntry: 1, controlsSector: false },
+        { id: 'faction-b', factionId: 'faction-b', ships: [{ type: 'cruiser' as ShipType, count: 2 }], turnOfEntry: 2, controlsSector: true },
       ],
       npcs: [],
     };
@@ -137,10 +137,10 @@ describe('Integration: player vs Ancient NPC', () => {
 
     const setup: SectorSetup = {
       factions: [
-        { factionId: 'player', ships: [{ type: 'interceptor' as ShipType, count: 3 }], turnOfEntry: 1, controlsSector: false },
+        { id: 'player', factionId: 'player', ships: [{ type: 'interceptor' as ShipType, count: 3 }], turnOfEntry: 1, controlsSector: false },
       ],
       npcs: [
-        { type: 'ancient', blueprint: ancientBlueprint, count: 1 },
+        { id: 'npc-ancient-0', type: 'ancient', blueprint: ancientBlueprint, count: 1, turnOfEntry: 2 },
       ],
     };
 
@@ -172,10 +172,10 @@ describe('Integration: player vs GCDS', () => {
 
     const setup: SectorSetup = {
       factions: [
-        { factionId: 'player', ships: [{ type: 'interceptor' as ShipType, count: 2 }], turnOfEntry: 1, controlsSector: false },
+        { id: 'player', factionId: 'player', ships: [{ type: 'interceptor' as ShipType, count: 2 }], turnOfEntry: 1, controlsSector: false },
       ],
       npcs: [
-        { type: 'gcds', blueprint: gcdsBlueprint, count: 1 },
+        { id: 'npc-gcds-0', type: 'gcds', blueprint: gcdsBlueprint, count: 1, turnOfEntry: 2 },
       ],
     };
 
@@ -199,9 +199,9 @@ describe('Integration: 3-way battle', () => {
 
     const setup: SectorSetup = {
       factions: [
-        { factionId: 'faction-a', ships: [{ type: 'interceptor' as ShipType, count: 2 }], turnOfEntry: 1, controlsSector: true },
-        { factionId: 'faction-b', ships: [{ type: 'interceptor' as ShipType, count: 2 }], turnOfEntry: 2, controlsSector: false },
-        { factionId: 'faction-c', ships: [{ type: 'interceptor' as ShipType, count: 2 }], turnOfEntry: 3, controlsSector: false },
+        { id: 'faction-a', factionId: 'faction-a', ships: [{ type: 'interceptor' as ShipType, count: 2 }], turnOfEntry: 1, controlsSector: true },
+        { id: 'faction-b', factionId: 'faction-b', ships: [{ type: 'interceptor' as ShipType, count: 2 }], turnOfEntry: 2, controlsSector: false },
+        { id: 'faction-c', factionId: 'faction-c', ships: [{ type: 'interceptor' as ShipType, count: 2 }], turnOfEntry: 3, controlsSector: false },
       ],
       npcs: [],
     };
@@ -244,8 +244,8 @@ describe('Integration: survivor counts are sensible', () => {
 
     const setup: SectorSetup = {
       factions: [
-        { factionId: 'faction-a', ships: [{ type: 'interceptor' as ShipType, count: MAX_INTERCEPTORS }], turnOfEntry: 1, controlsSector: false },
-        { factionId: 'faction-b', ships: [{ type: 'interceptor' as ShipType, count: MAX_INTERCEPTORS }], turnOfEntry: 2, controlsSector: true },
+        { id: 'faction-a', factionId: 'faction-a', ships: [{ type: 'interceptor' as ShipType, count: MAX_INTERCEPTORS }], turnOfEntry: 1, controlsSector: false },
+        { id: 'faction-b', factionId: 'faction-b', ships: [{ type: 'interceptor' as ShipType, count: MAX_INTERCEPTORS }], turnOfEntry: 2, controlsSector: true },
       ],
       npcs: [],
     };
@@ -260,7 +260,6 @@ describe('Integration: survivor counts are sensible', () => {
     for (const entry of results.summary) {
       expect(entry.avgSurvivors.interceptor).toBeGreaterThanOrEqual(0);
       expect(entry.avgSurvivors.interceptor).toBeLessThanOrEqual(MAX_INTERCEPTORS);
-      expect(entry.avgDamageDealt).toBeGreaterThanOrEqual(0);
     }
   });
 });

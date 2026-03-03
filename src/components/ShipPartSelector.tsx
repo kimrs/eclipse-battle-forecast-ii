@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { SHIP_PARTS } from '../data/shipParts';
+import { DIE_COLOR_CLASSES } from '../data/constants';
 import type { ShipPart, DieColor } from '../types/game';
 
 interface ShipPartSelectorProps {
@@ -25,14 +26,6 @@ function getCategory(part: ShipPart): string {
   }
   return 'Defense';
 }
-
-const DIE_COLOR_CLASSES: Record<DieColor, string> = {
-  yellow: 'bg-yellow-400 text-yellow-900',
-  orange: 'bg-orange-400 text-orange-900',
-  blue: 'bg-blue-500 text-white',
-  red: 'bg-red-500 text-white',
-  pink: 'bg-pink-400 text-pink-900',
-};
 
 function DiceList({ label, dice }: { label: string; dice: { color: DieColor; count: number }[] }) {
   if (dice.length === 0) return null;
@@ -85,23 +78,25 @@ export function ShipPartSelector({ onSelect, onClose, excludeDrives = false }: S
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
       <div
-        className="bg-white text-gray-900 rounded-lg shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col"
+        className="bg-white text-gray-900 shadow-xl w-full flex flex-col inset-0 fixed sm:relative sm:inset-auto sm:rounded-lg sm:max-w-lg sm:max-h-[80vh]"
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b">
-          <h2 className="font-semibold text-lg">Select Ship Part</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
-        </div>
+        <div className="sticky top-0 bg-white z-10 border-b">
+          <div className="flex items-center justify-between px-4 py-3">
+            <h2 className="font-semibold text-lg">Select Ship Part</h2>
+            <button onClick={onClose} className="min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+          </div>
 
-        <div className="px-4 py-2 border-b">
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search parts..."
-            className="w-full border rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-            autoFocus
-          />
+          <div className="px-4 py-2 border-t">
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search parts..."
+              className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              autoFocus
+            />
+          </div>
         </div>
 
         <div className="overflow-y-auto flex-1 px-4 py-2">
@@ -113,7 +108,7 @@ export function ShipPartSelector({ onSelect, onClose, excludeDrives = false }: S
                   <button
                     key={part.id}
                     onClick={() => { onSelect(part); onClose(); }}
-                    className="w-full text-left px-3 py-2 rounded border border-transparent hover:border-blue-400 hover:bg-blue-50 transition-colors"
+                    className="w-full text-left px-3 py-3 rounded border border-transparent hover:border-blue-400 hover:bg-blue-50 transition-colors"
                   >
                     <div className="font-medium text-sm">{part.name}</div>
                     <PartStats part={part} />
@@ -125,6 +120,12 @@ export function ShipPartSelector({ onSelect, onClose, excludeDrives = false }: S
           {Object.keys(grouped).length === 0 && (
             <p className="text-gray-400 text-sm text-center py-4">No parts found.</p>
           )}
+        </div>
+
+        <div className="sm:hidden border-t px-4 py-3">
+          <button onClick={onClose} className="w-full py-3 text-center text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+            Cancel
+          </button>
         </div>
       </div>
     </div>

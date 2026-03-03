@@ -1,13 +1,13 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useMemo } from 'react';
 import * as d3 from 'd3';
-import type { SimulationResults, Faction } from '../types/game';
+import type { SimulationResults } from '../types/game';
 
 interface ResultsChartProps {
   results: SimulationResults;
-  factions: Faction[];
+  nameMap: Record<string, string>;
 }
 
-const PALETTE = ['#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
+export const PALETTE = ['#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
 
 interface ChartEntry {
   label: string;
@@ -16,17 +16,14 @@ interface ChartEntry {
   color: string;
 }
 
-function buildChartData(results: SimulationResults, factions: Faction[]): ChartEntry[] {
+function buildChartData(results: SimulationResults, nameMap: Record<string, string>): ChartEntry[] {
   const totalWins = results.summary.reduce((sum, s) => sum + s.wins, 0);
-  return factions.map((f, i) => {
-    const wins = results.summary.find(s => s.factionId === f.id)?.wins ?? 0;
-    return {
-      label: f.name,
-      wins,
-      pct: totalWins > 0 ? wins / totalWins : 0,
-      color: PALETTE[i % PALETTE.length],
-    };
-  });
+  return results.summary.map((s, i) => ({
+    label: nameMap[s.factionId] ?? s.factionId,
+    wins: s.wins,
+    pct: totalWins > 0 ? s.wins / totalWins : 0,
+    color: PALETTE[i % PALETTE.length],
+  }));
 }
 
 function drawPieChart(
@@ -94,7 +91,7 @@ function drawPieChart(
       return (t: number) => arc(i(t) as d3.PieArcDatum<ChartEntry>) ?? '';
     });
 
-  // Hover interactions
+  // Hover interactions (mouse)
   paths
     .on('mouseenter', function(_event, d) {
       d3.select(this).attr('d', arcHover(d) ?? arc(d) ?? '');
@@ -112,13 +109,62 @@ function drawPieChart(
       d3.select(this).attr('d', arc(d) ?? '');
       tooltip.style('display', 'none');
     });
+
+  // Touch interactions (tap to toggle tooltip)
+  let activeTouch: d3.PieArcDatum<ChartEntry> | null = null;
+  paths.on('touchstart', function(event: TouchEvent, d) {
+    event.preventDefault();
+    if (activeTouch === d) {
+      // Tap same segment again: hide
+      d3.select(this).attr('d', arc(d) ?? '');
+      tooltip.style('display', 'none');
+      activeTouch = null;
+    } else {
+      // Reset previous
+      g.selectAll<SVGPathElement, d3.PieArcDatum<ChartEntry>>('path')
+        .attr('d', dd => arc(dd) ?? '');
+      // Expand tapped segment
+      d3.select(this).attr('d', arcHover(d) ?? arc(d) ?? '');
+      const touch = event.touches[0];
+      const rect = container.getBoundingClientRect();
+      tooltip
+        .style('display', 'block')
+        .text(`${d.data.label}: ${d.data.wins} wins (${(d.data.pct * 100).toFixed(1)}%)`)
+        .style('left', `${touch.clientX - rect.left + 12}px`)
+        .style('top', `${touch.clientY - rect.top - 40}px`);
+      activeTouch = d;
+    }
+  });
+
+  // Render percentage labels on segments large enough (> 8%)
+  const labelArc = d3.arc<d3.PieArcDatum<ChartEntry>>()
+    .innerRadius(radius * 0.55)
+    .outerRadius(radius * 0.55);
+
+  g.selectAll<SVGTextElement, d3.PieArcDatum<ChartEntry>>('text.pie-label')
+    .data(arcs.filter(d => d.data.pct > 0.08))
+    .join('text')
+    .attr('class', 'pie-label')
+    .attr('transform', d => `translate(${labelArc.centroid(d)})`)
+    .attr('text-anchor', 'middle')
+    .attr('dominant-baseline', 'central')
+    .attr('fill', '#fff')
+    .attr('font-size', '12px')
+    .attr('font-weight', '600')
+    .attr('pointer-events', 'none')
+    .attr('opacity', 0)
+    .text(d => `${(d.data.pct * 100).toFixed(0)}%`)
+    .transition()
+    .delay(600)
+    .duration(200)
+    .attr('opacity', 1);
 }
 
-export function ResultsChart({ results, factions }: ResultsChartProps) {
+export function ResultsChart({ results, nameMap }: ResultsChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const totalRuns = results.config.runs;
-  const chartData = buildChartData(results, factions);
+  const chartData = useMemo(() => buildChartData(results, nameMap), [results, nameMap]);
 
   useEffect(() => {
     const svg = svgRef.current;
@@ -131,7 +177,7 @@ export function ResultsChart({ results, factions }: ResultsChartProps) {
     const observer = new ResizeObserver(render);
     observer.observe(container);
     return () => observer.disconnect();
-  }, [results, factions, totalRuns, chartData]);
+  }, [totalRuns, chartData]);
 
   return (
     <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">

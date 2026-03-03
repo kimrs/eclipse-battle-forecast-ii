@@ -1,6 +1,6 @@
 // Dice Types
 
-export type DieValue = number | 'star' | 'blank';
+export type DieValue = 2 | 3 | 4 | 5 | 'star' | 'blank';
 
 export interface DieFace {
   value: DieValue;       // 'star' = always hit, 'blank' = always miss, number = compare vs threshold
@@ -57,37 +57,6 @@ export interface Blueprint {
   innateEnergyProduction?: number;
 }
 
-function aggregateDieSymbols(symbols: DieSymbol[][]): DieSymbol[] {
-  const counts = new Map<DieColor, number>();
-  for (const group of symbols) {
-    for (const sym of group) {
-      counts.set(sym.color, (counts.get(sym.color) ?? 0) + sym.count);
-    }
-  }
-  return Array.from(counts.entries()).map(([color, count]) => ({ color, count }));
-}
-
-export function computeBlueprintStats(blueprint: Blueprint): {
-  cannons: DieSymbol[];
-  missiles: DieSymbol[];
-  computers: number;
-  shields: number;
-  hull: number;
-  initiative: number;
-  energyBalance: number;
-} {
-  const { parts, initiativeBonus } = blueprint;
-  return {
-    cannons: aggregateDieSymbols(parts.map(p => p.cannons)),
-    missiles: aggregateDieSymbols(parts.map(p => p.missiles)),
-    computers: parts.reduce((sum, p) => sum + p.computers, 0) + (blueprint.innateComputers ?? 0),
-    shields: parts.reduce((sum, p) => sum + p.shields, 0) + (blueprint.innateShields ?? 0),
-    hull: parts.reduce((sum, p) => sum + p.hull, 0) + (blueprint.innateHull ?? 0),
-    initiative: initiativeBonus + parts.reduce((sum, p) => sum + p.initiative, 0) + (blueprint.innateInitiative ?? 0),
-    energyBalance: parts.reduce((sum, p) => sum + p.energyProduction - p.energyConsumption, 0) + (blueprint.innateEnergyProduction ?? 0),
-  };
-}
-
 // Faction Types
 
 export interface Faction {
@@ -102,6 +71,7 @@ export interface Faction {
 export type NpcType = 'ancient' | 'guardian' | 'gcds';
 
 export interface FactionDeployment {
+  id: string;                // unique instance ID (allows duplicate factions)
   factionId: string;
   ships: { type: ShipType; count: number }[];
   turnOfEntry: number;       // lower = entered earlier
@@ -109,10 +79,11 @@ export interface FactionDeployment {
 }
 
 export interface NpcDeployment {
+  id: string;                // unique instance ID for React keys
   type: NpcType;
   blueprint: Blueprint;      // uses NPC blueprint tile
   count: number;             // number of NPC ships
-  turnOfEntry?: number;      // optional — NPC join order
+  turnOfEntry: number;       // NPC join order
 }
 
 export interface SectorSetup {
@@ -136,13 +107,13 @@ export interface FactionResult {
   factionId: string;
   wins: number;
   avgSurvivors: Record<ShipType, number>;
-  avgDamageDealt: number;
 }
 
 export interface BattleEvent {
   phase: 'missile' | 'cannon';
   round: number;           // 0 for missiles, 1+ for engagement
   factionId: string;
+  targetFactionId: string;
   shipType: ShipType;
   shipCount: number;
   dice: { color: DieColor; value: DieValue }[];
@@ -165,10 +136,20 @@ export interface SimulationResults {
 
 // Battle Runtime Types (internal to engine)
 
+export interface BlueprintStats {
+  cannons: DieSymbol[];
+  missiles: DieSymbol[];
+  computers: number;
+  shields: number;
+  hull: number;
+  initiative: number;
+}
+
 export interface BattleShip {
   id: string;              // unique per ship instance
   factionId: string;
   blueprint: Blueprint;
+  stats: BlueprintStats;   // pre-computed once at creation, avoids hot-loop recomputation
   currentHull: number;     // remaining HP, starts at totalHull
   hasFiredMissiles: boolean;
   hasRiftWeapon: boolean;  // true if any part has isRiftWeapon — eligible for backfire

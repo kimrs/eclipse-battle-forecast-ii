@@ -1,18 +1,11 @@
 import { BattleSetup } from '../components/BattleSetup';
+import { SHIP_TYPE_MAX } from '../data/constants';
 import type {
   Faction,
   FactionDeployment,
   NpcDeployment,
   SimulationConfig,
-  ShipType,
 } from '../types/game';
-
-const SHIP_TYPE_MAX: Record<ShipType, number> = {
-  interceptor: 8,
-  cruiser: 4,
-  dreadnought: 2,
-  starbase: 4,
-};
 
 function getValidationErrors(
   factionDeployments: FactionDeployment[],
@@ -138,22 +131,67 @@ export function BattleSection({
                 }
                 className="w-full bg-gray-700 border border-gray-600 text-white rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
+              <div className="flex gap-1 mt-1.5">
+                {[100, 500, 1000].map(v => (
+                  <button
+                    key={v}
+                    onClick={() => onConfigChange(c => ({ ...c, runs: v }))}
+                    className={`px-2 py-1 text-xs rounded transition-colors ${
+                      config.runs === v
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-700 text-gray-400 hover:text-white border border-gray-600'
+                    }`}
+                  >
+                    {v}
+                  </button>
+                ))}
+              </div>
               {config.runs < 1 && (
                 <p className="text-red-400 text-xs mt-1">Must be at least 1.</p>
               )}
             </div>
             <div>
               <label className="block text-sm text-gray-400 mb-1">Dice Pool Size</label>
-              <input
-                type="number"
-                min={6}
-                step={6}
-                value={config.dicePool}
-                onChange={e =>
-                  onConfigChange(c => ({ ...c, dicePool: Math.max(6, parseInt(e.target.value, 10) || 6) }))
-                }
-                className="w-full bg-gray-700 border border-gray-600 text-white rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-              />
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => onConfigChange(c => ({ ...c, dicePool: Math.max(6, c.dicePool - 6) }))}
+                  disabled={config.dicePool <= 6}
+                  className="min-w-[44px] min-h-[44px] flex items-center justify-center bg-gray-700 border border-gray-600 text-gray-300 hover:text-white rounded text-lg font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  −
+                </button>
+                <input
+                  type="number"
+                  min={6}
+                  step={6}
+                  value={config.dicePool}
+                  onChange={e =>
+                    onConfigChange(c => ({ ...c, dicePool: Math.max(6, parseInt(e.target.value, 10) || 6) }))
+                  }
+                  className="flex-1 bg-gray-700 border border-gray-600 text-white rounded px-3 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-400"
+                />
+                <button
+                  onClick={() => onConfigChange(c => ({ ...c, dicePool: c.dicePool + 6 }))}
+                  className="min-w-[44px] min-h-[44px] flex items-center justify-center bg-gray-700 border border-gray-600 text-gray-300 hover:text-white rounded text-lg font-bold transition-colors"
+                >
+                  +
+                </button>
+              </div>
+              <div className="flex gap-1 mt-1.5">
+                {[600, 1200].map(v => (
+                  <button
+                    key={v}
+                    onClick={() => onConfigChange(c => ({ ...c, dicePool: v }))}
+                    className={`px-2 py-1 text-xs rounded transition-colors ${
+                      config.dicePool === v
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-700 text-gray-400 hover:text-white border border-gray-600'
+                    }`}
+                  >
+                    {v}
+                  </button>
+                ))}
+              </div>
               {config.dicePool % 6 !== 0 && (
                 <p className="text-red-400 text-xs mt-1">Must be divisible by 6.</p>
               )}
@@ -178,7 +216,7 @@ export function BattleSection({
           <button
             onClick={handleRunSimulation}
             disabled={!isValid}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors text-sm"
+            className="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors text-sm"
           >
             ▶ Run Simulation
           </button>

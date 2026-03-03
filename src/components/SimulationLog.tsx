@@ -1,19 +1,18 @@
 import { useState } from 'react';
-import type { SimulationRunResult, Faction, BattleEvent, DieColor, DieValue } from '../types/game';
+import { DIE_COLOR_CLASSES } from '../data/constants';
+import type { SimulationRunResult, BattleEvent, DieColor, DieValue } from '../types/game';
 
 interface SimulationLogProps {
   runs: SimulationRunResult[];
-  factions: Faction[];
+  nameMap: Record<string, string>;
+  colorMap: Record<string, string>;
 }
 
 const PAGE_SIZE = 20;
 
-function getFactionName(factions: Faction[], id: string | null): string {
+function getFactionName(nameMap: Record<string, string>, id: string | null): string {
   if (id === null) return 'Draw';
-  const faction = factions.find(f => f.id === id);
-  if (faction) return faction.name;
-  // NPC ids like "npc-ancient-0"
-  return id.replace(/^npc-/, '').replace(/-\d+$/, '');
+  return nameMap[id] ?? id;
 }
 
 function formatSurvivors(
@@ -28,50 +27,65 @@ function formatSurvivors(
     .join(', ');
 }
 
-const DIE_BG: Record<DieColor, string> = {
-  yellow: 'bg-yellow-400 text-yellow-900',
-  orange: 'bg-orange-400 text-orange-900',
-  blue: 'bg-blue-500 text-white',
-  red: 'bg-red-500 text-white',
-  pink: 'bg-pink-400 text-pink-900',
-};
-
 function DieChip({ color, value }: { color: DieColor; value: DieValue }) {
-  const label = value === 'star' ? '\u2605' : value === 'blank' ? '' : String(value);
+  const label = value === 'star' ? '\u2605' : value === 'blank' ? '\u00A0' : String(value);
   return (
-    <span className={`inline-block text-[10px] leading-none px-1 py-0.5 rounded font-bold min-w-[1.2em] ${DIE_BG[color]}`}>
+    <span className={`inline-block text-[10px] leading-none px-1 py-0.5 rounded font-bold min-w-[1.2em] text-center ${DIE_COLOR_CLASSES[color]}`}>
       {label}
     </span>
   );
 }
 
-function EventRow({ event, factions }: { event: BattleEvent; factions: Faction[] }) {
-  const name = getFactionName(factions, event.factionId);
-  const phaseLabel = event.phase === 'missile' ? 'Missile' : `Round ${event.round}`;
+function EventRow({ event, nameMap, showDice, colorMap }: { event: BattleEvent; nameMap: Record<string, string>; showDice: boolean; colorMap: Record<string, string> }) {
+  const name = getFactionName(nameMap, event.factionId);
+  const factionColor = colorMap[event.factionId];
+  const targetColor = colorMap[event.targetFactionId];
+  const isNpcTarget = event.targetFactionId.startsWith('npc-');
+  const targetName = getFactionName(nameMap, event.targetFactionId);
+  const phaseLabel = event.phase === 'missile' ? 'Mis' : `R${event.round}`;
+  const phaseLabelFull = event.phase === 'missile' ? 'Missile' : `Round ${event.round}`;
+  const dmgLabel = event.hits > 0 ? `${event.damageDealt} dmg` : 'miss';
+  const formatKills = (kills: typeof event.kills) =>
+    kills.map(k => `${k.count}x ${isNpcTarget ? targetName : k.type}`).join(', ');
+  const killLabel = event.kills.length > 0
+    ? `, killed ${formatKills(event.kills)}`
+    : '';
   return (
     <div className="flex flex-col gap-0.5 py-1 border-b border-gray-800 last:border-0">
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-gray-500 text-[10px] uppercase w-16 shrink-0">{phaseLabel}</span>
-        <span className="text-blue-300 text-xs">{name}</span>
+      {/* Mobile: compact two-line layout */}
+      <div className="sm:hidden text-xs">
+        <span className="text-gray-500">{phaseLabel}</span>
+        {' '}
+        <span style={factionColor ? { color: factionColor } : undefined} className={factionColor ? undefined : 'text-blue-300'}>{name}</span>
+        {' '}
+        <span className="text-gray-500">{event.shipCount}x {event.shipType}</span>
+        {' → '}
+        <span className="text-gray-400">{dmgLabel}</span>
+        {event.kills.length > 0 && (
+          <span style={targetColor ? { color: targetColor } : undefined} className={targetColor ? undefined : 'text-red-400'}>{killLabel}</span>
+        )}
+      </div>
+      {/* Desktop: spread layout */}
+      <div className="hidden sm:flex items-center gap-2 flex-wrap">
+        <span className="text-gray-500 text-[10px] uppercase w-16 shrink-0">{phaseLabelFull}</span>
+        <span style={factionColor ? { color: factionColor } : undefined} className={factionColor ? 'text-xs' : 'text-blue-300 text-xs'}>{name}</span>
         <span className="text-gray-500 text-xs">
           {event.shipCount}x {event.shipType}
         </span>
-        <span className="text-gray-600 text-[10px]">
-          {event.hits > 0
-            ? `${event.damageDealt} dmg`
-            : 'miss'}
-        </span>
+        <span className="text-gray-600 text-[10px]">{dmgLabel}</span>
         {event.kills.length > 0 && (
-          <span className="text-red-400 text-[10px]">
-            destroyed {event.kills.map(k => `${k.count}x ${k.type}`).join(', ')}
+          <span style={targetColor ? { color: targetColor } : undefined} className={targetColor ? 'text-[10px]' : 'text-red-400 text-[10px]'}>
+            destroyed {formatKills(event.kills)}
           </span>
         )}
       </div>
-      <div className="flex gap-0.5 flex-wrap ml-16">
-        {event.dice.map((d, i) => (
-          <DieChip key={i} color={d.color} value={d.value} />
-        ))}
-      </div>
+      {showDice && (
+        <div className="flex gap-0.5 flex-wrap ml-0 sm:ml-16">
+          {event.dice.map((d, i) => (
+            <DieChip key={i} color={d.color} value={d.value} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -79,17 +93,20 @@ function EventRow({ event, factions }: { event: BattleEvent; factions: Faction[]
 function RunRow({
   index,
   run,
-  factions,
+  nameMap,
   expanded,
   onToggle,
+  colorMap,
 }: {
   index: number;
   run: SimulationRunResult;
-  factions: Faction[];
+  nameMap: Record<string, string>;
   expanded: boolean;
   onToggle: () => void;
+  colorMap: Record<string, string>;
 }) {
-  const winnerName = getFactionName(factions, run.winnerId);
+  const [showDice, setShowDice] = useState(true);
+  const winnerName = getFactionName(nameMap, run.winnerId);
   const survivorSummary = formatSurvivors(run, run.winnerId);
 
   return (
@@ -104,9 +121,9 @@ function RunRow({
         </span>
         {run.winnerId !== null ? (
           <>
-            <span className="text-blue-300 font-semibold">{winnerName}</span>
+            <span className="font-semibold" style={run.winnerId && colorMap[run.winnerId] ? { color: colorMap[run.winnerId] } : { color: '#93c5fd' }}>{winnerName}</span>
             <span className="text-gray-400">wins</span>
-            <span className="text-gray-300">({survivorSummary})</span>
+            <span className="text-gray-300 hidden sm:inline">({survivorSummary})</span>
           </>
         ) : (
           <span className="text-yellow-400 font-semibold">Draw</span>
@@ -114,11 +131,19 @@ function RunRow({
       </button>
 
       {expanded && (
-        <div className="bg-gray-900 px-4 py-3 font-mono text-xs space-y-1 border-t border-gray-700">
+        <div className="bg-gray-900 px-3 sm:px-4 py-3 font-mono text-xs space-y-1 border-t border-gray-700">
           {run.events && run.events.length > 0 ? (
             <div className="space-y-0">
+              <div className="flex justify-end mb-1">
+                <button
+                  onClick={() => setShowDice(v => !v)}
+                  className="text-[10px] text-gray-500 hover:text-gray-300 px-2 py-0.5 border border-gray-700 rounded transition-colors"
+                >
+                  {showDice ? 'hide dice' : 'show dice'}
+                </button>
+              </div>
               {run.events.map((event, i) => (
-                <EventRow key={i} event={event} factions={factions} />
+                <EventRow key={i} event={event} nameMap={nameMap} showDice={showDice} colorMap={colorMap} />
               ))}
               <div className="border-t border-gray-700 mt-2 pt-2">
                 {run.survivors.length === 0 ? (
@@ -126,7 +151,7 @@ function RunRow({
                 ) : (
                   run.survivors.map(({ factionId, ships }) => (
                     <div key={factionId} className="text-gray-300">
-                      <span className="text-gray-400">{getFactionName(factions, factionId)} survivors:</span>{' '}
+                      <span className="text-gray-400">{getFactionName(nameMap, factionId)} survivors:</span>{' '}
                       {ships.length === 0
                         ? 'none'
                         : ships.map(s => `${s.count}\u00D7 ${s.type}`).join(', ')}
@@ -142,7 +167,7 @@ function RunRow({
               ) : (
                 run.survivors.map(({ factionId, ships }) => (
                   <div key={factionId} className="text-gray-300">
-                    <span className="text-gray-400">{getFactionName(factions, factionId)}:</span>{' '}
+                    <span className="text-gray-400">{getFactionName(nameMap, factionId)}:</span>{' '}
                     {ships.length === 0
                       ? 'no ships'
                       : ships.map(s => `${s.count}\u00D7 ${s.type}`).join(', ')}
@@ -160,7 +185,7 @@ function RunRow({
   );
 }
 
-export function SimulationLog({ runs, factions }: SimulationLogProps) {
+export function SimulationLog({ runs, nameMap, colorMap }: SimulationLogProps) {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [expandedSet, setExpandedSet] = useState<Set<number>>(new Set());
   const [allExpanded, setAllExpanded] = useState(false);
@@ -216,16 +241,17 @@ export function SimulationLog({ runs, factions }: SimulationLogProps) {
               key={i}
               index={i}
               run={run}
-              factions={factions}
+              nameMap={nameMap}
               expanded={isExpanded(i)}
               onToggle={() => handleToggle(i)}
+              colorMap={colorMap}
             />
           ))}
 
           {visibleCount < runs.length && (
             <button
               onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
-              className="w-full mt-2 py-2 text-sm text-gray-400 hover:text-gray-200 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+              className="w-full mt-2 py-3 text-sm text-gray-400 hover:text-gray-200 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
             >
               Show More ({runs.length - visibleCount} remaining)
             </button>

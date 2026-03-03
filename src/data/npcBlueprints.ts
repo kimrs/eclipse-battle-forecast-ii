@@ -1,8 +1,8 @@
 import type { NpcType, Blueprint } from '../types/game';
-import { SHIP_PARTS } from './shipParts';
+import { PART_BY_ID } from './constants';
 
 function getPart(id: string) {
-  const part = SHIP_PARTS.find(p => p.id === id);
+  const part = PART_BY_ID[id];
   if (!part) throw new Error(`Ship part not found: ${id}`);
   return part;
 }

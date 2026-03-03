@@ -5,7 +5,9 @@ import {
   resolveHits,
 } from '../hitAssignment';
 import type { HitResult, PendingDieResult } from '../hitAssignment';
-import type { BattleShip, Blueprint, DieColor, ShipPart } from '../../types/game';
+import type { BattleShip, Blueprint, DieValue, ShipPart } from '../../types/game';
+import { computeBlueprintStats } from '../blueprintStats';
+import { PART_BY_ID } from '../../data/constants';
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -14,47 +16,13 @@ import type { BattleShip, Blueprint, DieColor, ShipPart } from '../../types/game
 function makeBlueprint(hull: number, shields: number, hasRiftWeapon = false): Blueprint {
   const parts: ShipPart[] = [];
   if (shields > 0) {
-    parts.push({
-      id: 'shield',
-      name: 'Shield',
-      cannons: [],
-      missiles: [],
-      computers: 0,
-      shields,
-      hull: 0,
-      initiative: 0,
-      energyProduction: 0,
-      energyConsumption: 0,
-    });
+    parts.push({ ...PART_BY_ID['gauss-shield'], shields });
   }
   if (hull > 0) {
-    parts.push({
-      id: 'hull',
-      name: 'Hull',
-      cannons: [],
-      missiles: [],
-      computers: 0,
-      shields: 0,
-      hull,
-      initiative: 0,
-      energyProduction: 0,
-      energyConsumption: 0,
-    });
+    parts.push({ ...PART_BY_ID['hull'], hull });
   }
   if (hasRiftWeapon) {
-    parts.push({
-      id: 'rift-cannon',
-      name: 'Rift Cannon',
-      cannons: [{ color: 'pink' as DieColor, count: 1 }],
-      missiles: [],
-      computers: 0,
-      shields: 0,
-      hull: 0,
-      initiative: 0,
-      energyProduction: 0,
-      energyConsumption: 0,
-      isRiftWeapon: true,
-    });
+    parts.push(PART_BY_ID['rift-cannon']);
   }
   return { shipType: 'interceptor', initiativeBonus: 0, slots: 8, parts };
 }
@@ -66,10 +34,20 @@ function makeShip(
   shields: number,
   hasRiftWeapon = false,
 ): BattleShip {
+  const blueprint = makeBlueprint(hull, shields, hasRiftWeapon);
+  const fullStats = computeBlueprintStats(blueprint);
   return {
     id,
     factionId,
-    blueprint: makeBlueprint(hull, shields, hasRiftWeapon),
+    blueprint,
+    stats: {
+      cannons: fullStats.cannons,
+      missiles: fullStats.missiles,
+      computers: fullStats.computers,
+      shields: fullStats.shields,
+      hull: fullStats.hull,
+      initiative: fullStats.initiative,
+    },
     currentHull: hull,
     hasFiredMissiles: false,
     hasRiftWeapon,
@@ -191,7 +169,7 @@ function riftDie(damage: number, selfDamage = 0): PendingDieResult {
   };
 }
 
-function stdDie(faceValue: number, damage: number, computers: number): PendingDieResult {
+function stdDie(faceValue: DieValue, damage: number, computers: number): PendingDieResult {
   return {
     faceValue,
     damage,

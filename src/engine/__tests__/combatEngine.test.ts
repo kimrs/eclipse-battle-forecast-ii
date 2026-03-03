@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import type { BattleShip, Blueprint, DieFace, DieColor, Faction, ShipType, SectorSetup } from '../../types/game';
+import { computeBlueprintStats } from '../blueprintStats';
 import type { DiceEngine } from '../diceEngine';
 import { resolveBattlePair, simulateSectorBattle, runSimulations } from '../combatEngine';
+import { PART_BY_ID } from '../../data/constants';
 
 // ── Test helpers ──────────────────────────────────────────────────────────
 
@@ -20,37 +22,23 @@ function makeBlueprint(overrides: Partial<{
   };
 }
 
-const YELLOW_CANNON_PART = {
-  id: 'ion-cannon',
-  name: 'Ion Cannon',
-  cannons: [{ color: 'yellow' as DieColor, count: 1 }],
-  missiles: [],
-  computers: 0,
-  shields: 0,
-  hull: 0,
-  initiative: 0,
-  energyProduction: 0,
-  energyConsumption: 1,
-};
-
-const YELLOW_MISSILE_PART = {
-  id: 'ion-missile',
-  name: 'Ion Missile',
-  cannons: [],
-  missiles: [{ color: 'yellow' as DieColor, count: 1 }],
-  computers: 0,
-  shields: 0,
-  hull: 0,
-  initiative: 0,
-  energyProduction: 0,
-  energyConsumption: 2,
-};
+const YELLOW_CANNON_PART = PART_BY_ID['ion-cannon'];
+const YELLOW_MISSILE_PART = PART_BY_ID['ion-missile'];
 
 function makeBattleShip(id: string, factionId: string, blueprint: Blueprint, hull = 0): BattleShip {
+  const fullStats = computeBlueprintStats(blueprint);
   return {
     id,
     factionId,
     blueprint,
+    stats: {
+      cannons: fullStats.cannons,
+      missiles: fullStats.missiles,
+      computers: fullStats.computers,
+      shields: fullStats.shields,
+      hull: fullStats.hull,
+      initiative: fullStats.initiative,
+    },
     currentHull: hull,
     hasFiredMissiles: false,
     hasRiftWeapon: false,
@@ -93,8 +81,8 @@ describe('resolveBattlePair', () => {
     // A fires first (higher initiative): HIT kills D; D never fires
     const engine = makeFixedEngine({ yellow: [HIT] });
     const result = resolveBattlePair(
-      { factionId: 'A', ships: aShips },
-      { factionId: 'D', ships: dShips },
+      { id: 'A', factionId: 'A', ships: aShips },
+      { id: 'D', factionId: 'D', ships: dShips },
       engine,
       false,
     );
@@ -111,21 +99,18 @@ describe('resolveBattlePair', () => {
     // Same initiative=0: Defender fires first (D fires HIT, A dies, A never fires)
     const engine = makeFixedEngine({ yellow: [HIT, MISS] });
     const result = resolveBattlePair(
-      { factionId: 'A', ships: aShips },
-      { factionId: 'D', ships: dShips },
+      { id: 'A', factionId: 'A', ships: aShips },
+      { id: 'D', factionId: 'D', ships: dShips },
       engine,
       false,
     );
     expect(result.winnerId).toBe('D');
   });
 
-  it('mutual destruction returns winnerId null', () => {
-    // Both ships have hull 0 and both get hit simultaneously (same initiative)
-    // D fires first (defender), kills A; then A's slot has no ships left
-    // Simulate: both miss then both hit... need a scenario where both die
-    // Use high-initiative attacker to fire first, kill D; D fires, kill A
+  it('higher-initiative attacker wins 1v1 when hit kills defender before it fires', () => {
+    // Attacker with initiative 10 fires first, hits defender → defender dies before firing
     const aBp = makeBlueprint({
-      initiativeBonus: 10, // attacker fires first
+      initiativeBonus: 10,
       parts: [YELLOW_CANNON_PART],
     });
     const dBp = makeBlueprint({
@@ -135,19 +120,10 @@ describe('resolveBattlePair', () => {
     const aShips = [makeBattleShip('a0', 'A', aBp)];
     const dShips = [makeBattleShip('d0', 'D', dBp)];
 
-    // A fires first (higher initiative): hits D
-    // D fires next: hits A (even though A's shot already killed D,
-    //   both fire "simultaneously" — no, the engine applies damage immediately)
-    // With immediate damage: A fires (hits D → D dies), then D has no ships → A wins.
-    // For mutual destruction we need A to die from backfire or a different setup.
-    // Let's use: no one has cannons → stalemate → A loses (not mutual destruction).
-    // True mutual destruction is hard to force with the greedy model.
-    // Just verify the stalemate case instead — separate test below.
-    // For this test, verify attacker wins when firing first with HIT.
     const engine = makeFixedEngine({ yellow: [HIT] });
     const result = resolveBattlePair(
-      { factionId: 'A', ships: aShips },
-      { factionId: 'D', ships: dShips },
+      { id: 'A', factionId: 'A', ships: aShips },
+      { id: 'D', factionId: 'D', ships: dShips },
       engine,
       false,
     );
@@ -164,8 +140,8 @@ describe('resolveBattlePair', () => {
     // Both missiles miss
     const engine = makeFixedEngine({ yellow: [MISS, MISS] });
     const result = resolveBattlePair(
-      { factionId: 'A', ships: aShips },
-      { factionId: 'D', ships: dShips },
+      { id: 'A', factionId: 'A', ships: aShips },
+      { id: 'D', factionId: 'D', ships: dShips },
       engine,
       false,
     );
@@ -186,8 +162,8 @@ describe('resolveBattlePair', () => {
     // Engagement: D is dead, no engagement
     const engine = makeFixedEngine({ yellow: [HIT] }); // A's missile hits
     const result = resolveBattlePair(
-      { factionId: 'A', ships: aShips },
-      { factionId: 'D', ships: dShips },
+      { id: 'A', factionId: 'A', ships: aShips },
+      { id: 'D', factionId: 'D', ships: dShips },
       engine,
       false,
     );
@@ -202,8 +178,8 @@ describe('resolveBattlePair', () => {
 
     const engine = makeFixedEngine({});
     const result = resolveBattlePair(
-      { factionId: 'A', ships: aShips },
-      { factionId: 'D', ships: dShips },
+      { id: 'A', factionId: 'A', ships: aShips },
+      { id: 'D', factionId: 'D', ships: dShips },
       engine,
       false,
     );
@@ -232,8 +208,8 @@ describe('simulateSectorBattle', () => {
   it('two factions: winner determined correctly', () => {
     const setup: SectorSetup = {
       factions: [
-        { factionId: 'A', ships: [{ type: 'interceptor', count: 1 }], turnOfEntry: 2, controlsSector: false },
-        { factionId: 'D', ships: [{ type: 'interceptor', count: 1 }], turnOfEntry: 1, controlsSector: true },
+        { id: 'A', factionId: 'A', ships: [{ type: 'interceptor', count: 1 }], turnOfEntry: 2, controlsSector: false },
+        { id: 'D', factionId: 'D', ships: [{ type: 'interceptor', count: 1 }], turnOfEntry: 1, controlsSector: true },
       ],
       npcs: [],
     };
@@ -267,9 +243,9 @@ describe('simulateSectorBattle', () => {
 
     const setup: SectorSetup = {
       factions: [
-        { factionId: 'A', ships: [{ type: 'interceptor', count: 1 }], turnOfEntry: 3, controlsSector: false },
-        { factionId: 'B', ships: [{ type: 'interceptor', count: 1 }], turnOfEntry: 2, controlsSector: false },
-        { factionId: 'C', ships: [{ type: 'interceptor', count: 1 }], turnOfEntry: 1, controlsSector: true },
+        { id: 'A', factionId: 'A', ships: [{ type: 'interceptor', count: 1 }], turnOfEntry: 3, controlsSector: false },
+        { id: 'B', factionId: 'B', ships: [{ type: 'interceptor', count: 1 }], turnOfEntry: 2, controlsSector: false },
+        { id: 'C', factionId: 'C', ships: [{ type: 'interceptor', count: 1 }], turnOfEntry: 1, controlsSector: true },
       ],
       npcs: [],
     };
@@ -291,8 +267,8 @@ describe('simulateSectorBattle', () => {
     };
     const setup: SectorSetup = {
       factions: [
-        { factionId: 'A', ships: [{ type: 'interceptor', count: 1 }], turnOfEntry: 1, controlsSector: true },
-        { factionId: 'B', ships: [{ type: 'interceptor', count: 1 }], turnOfEntry: 2, controlsSector: false },
+        { id: 'A', factionId: 'A', ships: [{ type: 'interceptor', count: 1 }], turnOfEntry: 1, controlsSector: true },
+        { id: 'B', factionId: 'B', ships: [{ type: 'interceptor', count: 1 }], turnOfEntry: 2, controlsSector: false },
       ],
       npcs: [],
     };
@@ -324,8 +300,8 @@ describe('runSimulations', () => {
   it('returns correct structure with wins summing to runs', () => {
     const setup: SectorSetup = {
       factions: [
-        { factionId: 'A', ships: [{ type: 'interceptor', count: 1 }], turnOfEntry: 2, controlsSector: false },
-        { factionId: 'B', ships: [{ type: 'interceptor', count: 1 }], turnOfEntry: 1, controlsSector: true },
+        { id: 'A', factionId: 'A', ships: [{ type: 'interceptor', count: 1 }], turnOfEntry: 2, controlsSector: false },
+        { id: 'B', factionId: 'B', ships: [{ type: 'interceptor', count: 1 }], turnOfEntry: 1, controlsSector: true },
       ],
       npcs: [],
     };
@@ -346,8 +322,8 @@ describe('runSimulations', () => {
   it('all summary faction IDs are present', () => {
     const setup: SectorSetup = {
       factions: [
-        { factionId: 'X', ships: [{ type: 'interceptor', count: 1 }], turnOfEntry: 2, controlsSector: false },
-        { factionId: 'Y', ships: [{ type: 'interceptor', count: 1 }], turnOfEntry: 1, controlsSector: true },
+        { id: 'X', factionId: 'X', ships: [{ type: 'interceptor', count: 1 }], turnOfEntry: 2, controlsSector: false },
+        { id: 'Y', factionId: 'Y', ships: [{ type: 'interceptor', count: 1 }], turnOfEntry: 1, controlsSector: true },
       ],
       npcs: [],
     };

@@ -1,49 +1,27 @@
 import { describe, it, expect } from 'vitest';
 import { resolveInitiativeOrder } from '../initiativeResolver';
-import type { Blueprint, ShipType } from '../../types/game';
+import type { ShipType } from '../../types/game';
 
-function makeBlueprint(shipType: ShipType, initiativeBonus: number, partInitiative = 0): Blueprint {
+function makeInitiatives(values: Partial<Record<ShipType, number>>): Record<ShipType, number> {
   return {
-    shipType,
-    initiativeBonus,
-    slots: 4,
-    parts: partInitiative === 0 ? [] : [
-      {
-        id: 'test-part',
-        name: 'Test Part',
-        cannons: [],
-        missiles: [],
-        computers: 0,
-        shields: 0,
-        hull: 0,
-        initiative: partInitiative,
-        energyProduction: 0,
-        energyConsumption: 0,
-      },
-    ],
+    interceptor: 0,
+    cruiser: 0,
+    dreadnought: 0,
+    starbase: 0,
+    ...values,
   };
 }
 
 describe('resolveInitiativeOrder', () => {
   it('returns entries sorted by initiative descending', () => {
-    const attackerBlueprints = {
-      interceptor: makeBlueprint('interceptor', 2),
-      cruiser: makeBlueprint('cruiser', 1),
-      dreadnought: makeBlueprint('dreadnought', 0),
-      starbase: makeBlueprint('starbase', 0),
-    };
-    const defenderBlueprints = {
-      interceptor: makeBlueprint('interceptor', 3),
-      cruiser: makeBlueprint('cruiser', 0),
-      dreadnought: makeBlueprint('dreadnought', 0),
-      starbase: makeBlueprint('starbase', 0),
-    };
+    const attackerInit = makeInitiatives({ interceptor: 2, cruiser: 1 });
+    const defenderInit = makeInitiatives({ interceptor: 3 });
 
     const result = resolveInitiativeOrder(
       'attacker',
       'defender',
-      attackerBlueprints,
-      defenderBlueprints,
+      attackerInit,
+      defenderInit,
       ['interceptor', 'cruiser'],
       ['interceptor'],
     );
@@ -55,25 +33,15 @@ describe('resolveInitiativeOrder', () => {
     expect(result[2]).toMatchObject({ factionId: 'attacker', shipType: 'cruiser', initiative: 1 });
   });
 
-  it('includes part initiative in calculation', () => {
-    const attackerBlueprints = {
-      interceptor: makeBlueprint('interceptor', 1, 2), // total 3
-      cruiser: makeBlueprint('cruiser', 0),
-      dreadnought: makeBlueprint('dreadnought', 0),
-      starbase: makeBlueprint('starbase', 0),
-    };
-    const defenderBlueprints = {
-      interceptor: makeBlueprint('interceptor', 2),    // total 2
-      cruiser: makeBlueprint('cruiser', 0),
-      dreadnought: makeBlueprint('dreadnought', 0),
-      starbase: makeBlueprint('starbase', 0),
-    };
+  it('pre-computed initiative values are used directly', () => {
+    const attackerInit = makeInitiatives({ interceptor: 3 }); // total 3 (e.g. bonus 1 + parts 2)
+    const defenderInit = makeInitiatives({ interceptor: 2 }); // total 2
 
     const result = resolveInitiativeOrder(
       'attacker',
       'defender',
-      attackerBlueprints,
-      defenderBlueprints,
+      attackerInit,
+      defenderInit,
       ['interceptor'],
       ['interceptor'],
     );
@@ -83,24 +51,13 @@ describe('resolveInitiativeOrder', () => {
   });
 
   it('tie-breaking favors Defender (Defender fires first on equal initiative)', () => {
-    const attackerBlueprints = {
-      interceptor: makeBlueprint('interceptor', 2),
-      cruiser: makeBlueprint('cruiser', 0),
-      dreadnought: makeBlueprint('dreadnought', 0),
-      starbase: makeBlueprint('starbase', 0),
-    };
-    const defenderBlueprints = {
-      interceptor: makeBlueprint('interceptor', 2),
-      cruiser: makeBlueprint('cruiser', 0),
-      dreadnought: makeBlueprint('dreadnought', 0),
-      starbase: makeBlueprint('starbase', 0),
-    };
+    const init = makeInitiatives({ interceptor: 2 });
 
     const result = resolveInitiativeOrder(
       'attacker',
       'defender',
-      attackerBlueprints,
-      defenderBlueprints,
+      init,
+      init,
       ['interceptor'],
       ['interceptor'],
     );
@@ -111,25 +68,15 @@ describe('resolveInitiativeOrder', () => {
   });
 
   it('only includes ship types actually present in battle', () => {
-    const attackerBlueprints = {
-      interceptor: makeBlueprint('interceptor', 3),
-      cruiser: makeBlueprint('cruiser', 2),
-      dreadnought: makeBlueprint('dreadnought', 1),
-      starbase: makeBlueprint('starbase', 0),
-    };
-    const defenderBlueprints = {
-      interceptor: makeBlueprint('interceptor', 0),
-      cruiser: makeBlueprint('cruiser', 0),
-      dreadnought: makeBlueprint('dreadnought', 4),
-      starbase: makeBlueprint('starbase', 0),
-    };
+    const attackerInit = makeInitiatives({ interceptor: 3, cruiser: 2, dreadnought: 1 });
+    const defenderInit = makeInitiatives({ dreadnought: 4 });
 
     // Attacker only has interceptors, defender only has dreadnoughts
     const result = resolveInitiativeOrder(
       'attacker',
       'defender',
-      attackerBlueprints,
-      defenderBlueprints,
+      attackerInit,
+      defenderInit,
       ['interceptor'],
       ['dreadnought'],
     );
@@ -143,14 +90,9 @@ describe('resolveInitiativeOrder', () => {
   });
 
   it('isDefender flag is set correctly', () => {
-    const bp = {
-      interceptor: makeBlueprint('interceptor', 1),
-      cruiser: makeBlueprint('cruiser', 0),
-      dreadnought: makeBlueprint('dreadnought', 0),
-      starbase: makeBlueprint('starbase', 0),
-    };
+    const init = makeInitiatives({ interceptor: 1 });
 
-    const result = resolveInitiativeOrder('a', 'b', bp, bp, ['interceptor'], ['interceptor']);
+    const result = resolveInitiativeOrder('a', 'b', init, init, ['interceptor'], ['interceptor']);
 
     const defender = result.find(e => e.factionId === 'b');
     const attacker = result.find(e => e.factionId === 'a');

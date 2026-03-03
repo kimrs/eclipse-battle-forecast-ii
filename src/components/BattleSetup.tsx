@@ -66,6 +66,7 @@ export function BattleSetup({
 
   const handleAddFaction = (faction: Faction) => {
     const newDeployment: FactionDeployment = {
+      id: crypto.randomUUID(),
       factionId: faction.id,
       ships: [
         { type: 'interceptor', count: 0 },
@@ -87,7 +88,7 @@ export function BattleSetup({
         ? blueprints.advanced
         : blueprints.normal;
     const turnOfEntry = factionDeployments.length + npcDeployments.length + 1;
-    onNpcDeploymentsChange([...npcDeployments, { type: option.type, blueprint, count: 1, turnOfEntry }]);
+    onNpcDeploymentsChange([...npcDeployments, { id: crypto.randomUUID(), type: option.type, blueprint, count: 1, turnOfEntry }]);
     setDropdownOpen(false);
   };
 
@@ -96,7 +97,7 @@ export function BattleSetup({
       {/* Unified combatant list: faction cards first, then NPC cards */}
       {factionDeployments.map((deployment, i) => (
         <FactionPanel
-          key={`faction-${i}`}
+          key={deployment.id}
           deployment={deployment}
           availableFactions={availableFactions}
           onChange={updated => handleUpdateFaction(i, updated)}
@@ -105,25 +106,24 @@ export function BattleSetup({
       ))}
       {npcDeployments.map((npc, i) => (
         <NpcPanel
-          key={`npc-${i}`}
+          key={npc.id}
           npc={npc}
           onUpdate={updated => handleUpdateNpc(i, updated)}
           onRemove={() => handleRemoveNpc(i)}
         />
       ))}
 
-      {/* ⊕ Add combatant button */}
-      <div className="flex justify-center pt-2">
-        <div className="relative" ref={dropdownRef}>
+      {/* Add combatant button */}
+      <div className="pt-2" ref={dropdownRef}>
+        <div className="relative sm:flex sm:justify-center">
           <button
             onClick={() => setDropdownOpen(prev => !prev)}
-            aria-label="Add combatant"
-            className="w-11 h-11 flex items-center justify-center rounded-full border-2 border-gray-500 text-gray-400 hover:border-blue-400 hover:text-blue-400 text-xl transition-colors"
+            className="w-full sm:w-auto py-3 sm:py-2 flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-500 text-gray-400 hover:border-blue-400 hover:text-blue-400 text-sm font-medium transition-colors sm:px-4"
           >
-            ⊕
+            + Add Combatant
           </button>
           {dropdownOpen && (
-            <div className="absolute left-1/2 -translate-x-1/2 top-12 z-10 bg-gray-800 border border-gray-600 rounded-xl shadow-xl min-w-[12rem] py-2">
+            <div className="absolute left-0 sm:left-1/2 sm:-translate-x-1/2 top-full mt-1 z-10 bg-gray-800 border border-gray-600 rounded-xl shadow-xl w-full sm:w-auto min-w-[16rem] py-2">
               {availableFactions.length > 0 ? (
                 <>
                   <p className="px-3 py-1 text-xs text-gray-500 uppercase tracking-wider">
@@ -133,7 +133,7 @@ export function BattleSetup({
                     <button
                       key={f.id}
                       onClick={() => handleAddFaction(f)}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 transition-colors"
+                      className="w-full text-left px-4 py-3 text-sm text-gray-200 hover:bg-gray-700 transition-colors"
                     >
                       {f.name}
                     </button>
@@ -141,14 +141,14 @@ export function BattleSetup({
                   <div className="border-t border-gray-700 my-1" />
                 </>
               ) : (
-                <p className="px-4 py-2 text-xs text-gray-500 italic">No factions configured</p>
+                <p className="px-4 py-3 text-xs text-gray-500 italic">No factions configured</p>
               )}
               <p className="px-3 py-1 text-xs text-gray-500 uppercase tracking-wider">NPCs</p>
               {NPC_OPTIONS.map(opt => (
                 <button
                   key={`${opt.type}-${opt.variant}`}
                   onClick={() => handleAddNpc(opt)}
-                  className="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 transition-colors"
+                  className="w-full text-left px-4 py-3 text-sm text-gray-200 hover:bg-gray-700 transition-colors"
                 >
                   {opt.label}
                 </button>

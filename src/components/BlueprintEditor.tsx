@@ -1,20 +1,13 @@
 import { useState } from 'react';
-import { computeBlueprintStats } from '../types/game';
+import { computeBlueprintStats } from '../engine/blueprintStats';
 import { ShipPartSelector } from './ShipPartSelector';
+import { DIE_COLOR_CLASSES } from '../data/constants';
 import type { Blueprint, ShipPart, DieColor } from '../types/game';
 
 interface BlueprintEditorProps {
   blueprint: Blueprint;
   onChange: (updated: Blueprint) => void;
 }
-
-const DIE_COLOR_CLASSES: Record<DieColor, string> = {
-  yellow: 'bg-yellow-400 text-yellow-900',
-  orange: 'bg-orange-400 text-orange-900',
-  blue: 'bg-blue-500 text-white',
-  red: 'bg-red-500 text-white',
-  pink: 'bg-pink-400 text-pink-900',
-};
 
 function DiceSymbols({ dice }: { dice: { color: DieColor; count: number }[] }) {
   if (dice.length === 0) return <span className="text-gray-400">—</span>;
@@ -38,7 +31,12 @@ export function BlueprintEditor({ blueprint, onChange }: BlueprintEditorProps) {
 
   const handleAdd = (slotIndex: number, part: ShipPart) => {
     const newParts = [...parts];
-    newParts[slotIndex] = part;
+    // Insert at the correct position, avoiding sparse array holes
+    if (slotIndex <= newParts.length) {
+      newParts[slotIndex] = part;
+    } else {
+      newParts.push(part);
+    }
     onChange({ ...blueprint, parts: newParts });
   };
 
@@ -71,32 +69,31 @@ export function BlueprintEditor({ blueprint, onChange }: BlueprintEditorProps) {
         {slotItems.map((part, i) => (
           <div
             key={i}
-            className={`border rounded-lg p-2 min-h-[80px] flex flex-col justify-between text-sm ${
+            className={`border rounded-lg p-2 min-h-[80px] flex flex-col text-sm relative ${
               part ? 'bg-gray-50 border-gray-300' : 'border-dashed border-gray-300 bg-white'
             }`}
           >
             {part ? (
               <>
-                <span className="font-medium text-gray-800 leading-snug">{part.name}</span>
+                <span className="font-medium text-gray-800 leading-snug pr-8">{part.name}</span>
                 <button
                   onClick={() => handleRemove(i)}
-                  className="mt-2 text-xs text-red-500 hover:text-red-700 self-start"
+                  className="absolute top-1 right-1 min-w-[44px] min-h-[44px] flex items-center justify-center text-red-500 hover:text-red-700 text-lg leading-none"
+                  aria-label="Remove part"
                 >
-                  [Remove]
+                  ✕
                 </button>
               </>
+            ) : usedSlots < slots ? (
+              <button
+                onClick={() => setSelectorOpenForSlot(i)}
+                className="flex-1 flex flex-col items-center justify-center gap-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded py-2 transition-colors"
+              >
+                <span className="text-lg">+</span>
+                <span className="text-xs">Add Part</span>
+              </button>
             ) : (
-              <>
-                <span className="text-gray-400 text-xs italic">empty</span>
-                {usedSlots < slots && (
-                  <button
-                    onClick={() => setSelectorOpenForSlot(i)}
-                    className="mt-2 text-xs text-blue-600 hover:text-blue-800 self-start"
-                  >
-                    [Add]
-                  </button>
-                )}
-              </>
+              <span className="text-gray-400 text-xs italic flex-1 flex items-center justify-center">empty</span>
             )}
           </div>
         ))}
@@ -117,7 +114,28 @@ export function BlueprintEditor({ blueprint, onChange }: BlueprintEditorProps) {
       {/* Stats Summary */}
       <div className="border rounded-lg p-3 bg-gray-50 text-sm space-y-1">
         <h4 className="font-semibold text-gray-600 mb-2">Stats Summary</h4>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+        {/* Mobile: compact single-column */}
+        <div className="flex flex-col gap-1 sm:hidden">
+          <div className="flex items-center gap-1">
+            <span className="text-gray-500 w-16 shrink-0">Cannons:</span>
+            <DiceSymbols dice={stats.cannons} />
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-gray-500 w-16 shrink-0">Missiles:</span>
+            <DiceSymbols dice={stats.missiles} />
+          </div>
+          <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-800">
+            <span><span className="text-gray-500">Comp:</span> {stats.computers >= 0 ? `+${stats.computers}` : stats.computers}</span>
+            <span><span className="text-gray-500">Shield:</span> {stats.shields >= 0 ? `+${stats.shields}` : stats.shields}</span>
+            <span><span className="text-gray-500">Hull:</span> {stats.hull}</span>
+            <span><span className="text-gray-500">Init:</span> {stats.initiative}</span>
+            <span className={stats.energyBalance >= 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
+              <span className="text-gray-500 font-normal">Energy:</span> {stats.energyBalance >= 0 ? `+${stats.energyBalance}` : stats.energyBalance}
+            </span>
+          </div>
+        </div>
+        {/* Desktop: 2-col grid */}
+        <div className="hidden sm:grid grid-cols-2 gap-x-4 gap-y-1">
           <span className="text-gray-500">Cannons:</span>
           <DiceSymbols dice={stats.cannons} />
 
@@ -125,16 +143,16 @@ export function BlueprintEditor({ blueprint, onChange }: BlueprintEditorProps) {
           <DiceSymbols dice={stats.missiles} />
 
           <span className="text-gray-500">Computer:</span>
-          <span>{stats.computers >= 0 ? `+${stats.computers}` : stats.computers}</span>
+          <span className="text-gray-800">{stats.computers >= 0 ? `+${stats.computers}` : stats.computers}</span>
 
           <span className="text-gray-500">Shield:</span>
-          <span>{stats.shields >= 0 ? `+${stats.shields}` : stats.shields}</span>
+          <span className="text-gray-800">{stats.shields >= 0 ? `+${stats.shields}` : stats.shields}</span>
 
           <span className="text-gray-500">Hull:</span>
-          <span>{stats.hull}</span>
+          <span className="text-gray-800">{stats.hull}</span>
 
           <span className="text-gray-500">Initiative:</span>
-          <span>
+          <span className="text-gray-800">
             {stats.initiative}{' '}
             <span className="text-gray-400 text-xs">
               (bonus: {initiativeBonus} + drives: {driveInitiative})

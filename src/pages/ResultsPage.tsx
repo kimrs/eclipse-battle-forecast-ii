@@ -5,9 +5,9 @@ import type {
   NpcDeployment,
   SimulationConfig,
   SimulationResults,
-  ShipType,
 } from '../types/game';
-import { ResultsChart } from '../components/ResultsChart';
+import { SHIP_TYPES, SHIP_TYPE_LABELS } from '../data/constants';
+import { ResultsChart, PALETTE } from '../components/ResultsChart';
 import { SimulationLog } from '../components/SimulationLog';
 
 export interface BattleSetupData {
@@ -17,20 +17,41 @@ export interface BattleSetupData {
   factions: Faction[];
 }
 
-const SHIP_LABELS: Record<ShipType, string> = {
-  interceptor: 'Int',
-  cruiser: 'Cru',
-  dreadnought: 'Drd',
-  starbase: 'SB',
-};
+function buildNameMap(
+  deployments: FactionDeployment[],
+  npcs: NpcDeployment[],
+  factions: Faction[],
+): Record<string, string> {
+  const map: Record<string, string> = {};
 
-function getFactionDisplayName(id: string, factions: Faction[]): string {
-  const faction = factions.find(f => f.id === id);
-  if (faction) return faction.name;
-  // NPC ids: "npc-ancient-0", "npc-guardian-1", "npc-gcds-0"
-  const match = id.match(/^npc-(.+)-\d+$/);
-  if (match) return match[1].charAt(0).toUpperCase() + match[1].slice(1);
-  return id;
+  // Count how many times each faction appears to disambiguate duplicates
+  const factionCounts = new Map<string, number>();
+  for (const dep of deployments) {
+    factionCounts.set(dep.factionId, (factionCounts.get(dep.factionId) ?? 0) + 1);
+  }
+
+  const factionIndex = new Map<string, number>();
+  for (const dep of deployments) {
+    const faction = factions.find(f => f.id === dep.factionId);
+    const baseName = faction?.name ?? dep.factionId;
+    const count = factionCounts.get(dep.factionId) ?? 1;
+    if (count > 1) {
+      const idx = (factionIndex.get(dep.factionId) ?? 0) + 1;
+      factionIndex.set(dep.factionId, idx);
+      map[dep.id] = `${baseName} #${idx}`;
+    } else {
+      map[dep.id] = baseName;
+    }
+  }
+
+  // NPC names
+  for (let i = 0; i < npcs.length; i++) {
+    const npcId = `npc-${npcs[i].type}-${i}`;
+    const raw = npcs[i].type;
+    map[npcId] = raw.charAt(0).toUpperCase() + raw.slice(1);
+  }
+
+  return map;
 }
 
 interface ResultsSectionProps {
@@ -41,7 +62,7 @@ export function ResultsSection({ setup }: ResultsSectionProps) {
   const [results, setResults] = useState<SimulationResults | null>(null);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [sortCol, setSortCol] = useState<'wins' | 'winPct' | 'damage'>('wins');
+  const [sortCol, setSortCol] = useState<'wins' | 'winPct'>('wins');
   const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
   const workerRef = useRef<Worker | null>(null);
 
@@ -94,8 +115,7 @@ export function ResultsSection({ setup }: ResultsSectionProps) {
   // Run when setup changes to a new non-null value
   useEffect(() => {
     if (setup) runSim();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setup]);
+  }, [setup, runSim]);
 
   // Clean up worker on unmount
   useEffect(() => {
@@ -104,7 +124,7 @@ export function ResultsSection({ setup }: ResultsSectionProps) {
     };
   }, []);
 
-  const handleSort = (col: 'wins' | 'winPct' | 'damage') => {
+  const handleSort = (col: 'wins' | 'winPct') => {
     if (sortCol === col) {
       setSortDir(d => (d === 'desc' ? 'asc' : 'desc'));
     } else {
@@ -115,39 +135,47 @@ export function ResultsSection({ setup }: ResultsSectionProps) {
 
   // Use config.runs for accurate totals (runs array may be limited for memory)
   const totalRuns = results?.config.runs ?? 0;
-  const allFactions: Faction[] = setup?.factions ?? [];
+
+  // Build name map from deployment IDs to display names
+  const nameMap = setup
+    ? buildNameMap(setup.factionDeployments, setup.npcDeployments, setup.factions)
+    : {};
 
   // Build display rows including NPCs
   const allIds: string[] = results
     ? results.summary.map(s => s.factionId)
     : [];
 
+  // Build color map: factionId → chart color, matching the order in results.summary
+  const colorMap: Record<string, string> = {};
+  for (let i = 0; i < allIds.length; i++) {
+    colorMap[allIds[i]] = PALETTE[i % PALETTE.length];
+  }
+
   const tableRows = allIds.map(id => {
     const sumEntry = results!.summary.find(s => s.factionId === id);
     const wins = sumEntry?.wins ?? 0;
     const winPct = totalRuns > 0 ? (wins / totalRuns) * 100 : 0;
-    const avgDmg = sumEntry?.avgDamageDealt ?? 0;
     const avgSurvivors = sumEntry?.avgSurvivors ?? {
       interceptor: 0,
       cruiser: 0,
       dreadnought: 0,
       starbase: 0,
     };
-    return { id, wins, winPct, avgDmg, avgSurvivors };
+    return { id, wins, winPct, avgSurvivors };
   });
 
   const sortedRows = [...tableRows].sort((a, b) => {
     const sign = sortDir === 'desc' ? -1 : 1;
     if (sortCol === 'wins') return sign * (a.wins - b.wins);
-    if (sortCol === 'winPct') return sign * (a.winPct - b.winPct);
-    return sign * (a.avgDmg - b.avgDmg);
+    return sign * (a.winPct - b.winPct);
   });
 
   const SortHeader = ({
     col,
     label,
   }: {
-    col: 'wins' | 'winPct' | 'damage';
+    col: 'wins' | 'winPct';
     label: string;
   }) => (
     <th
@@ -212,52 +240,71 @@ export function ResultsSection({ setup }: ResultsSectionProps) {
             ) : (
               <>
                 {/* Win probability chart */}
-                <ResultsChart results={results} factions={allFactions} />
+                <ResultsChart results={results} nameMap={nameMap} />
 
-                {/* Statistics table */}
-                <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
+                {/* Statistics — card layout on mobile */}
+                <div className="sm:hidden space-y-3">
+                  <h3 className="text-base font-semibold text-white">Per-Faction Statistics</h3>
+                  {sortedRows.map(row => {
+                    const survivorParts = SHIP_TYPES
+                      .filter(t => row.avgSurvivors[t] > 0)
+                      .map(t => `${row.avgSurvivors[t].toFixed(1)} ${SHIP_TYPE_LABELS[t].abbreviated}`);
+                    return (
+                      <div key={row.id} className="bg-gray-800 border border-gray-700 rounded-xl p-4">
+                        <div className="font-medium text-white mb-1 flex items-center gap-2">
+                          <span className="inline-block w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: colorMap[row.id] }} />
+                          {nameMap[row.id] ?? row.id}
+                        </div>
+                        <div className="text-sm text-gray-300 space-y-0.5">
+                          <div>Wins: {row.wins} ({row.winPct.toFixed(1)}%)</div>
+                          <div>Survivors: {survivorParts.length > 0 ? survivorParts.join(', ') : '—'}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Statistics — table layout on desktop */}
+                <div className="hidden sm:block bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
                   <div className="px-4 py-3 border-b border-gray-700">
-                    <h3 className="text-base sm:text-lg font-semibold text-white">Per-Faction Statistics</h3>
+                    <h3 className="text-lg font-semibold text-white">Per-Faction Statistics</h3>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-gray-700/50">
                         <tr>
-                          <th className="px-3 sm:px-4 py-2 text-left text-xs font-semibold text-gray-400 uppercase">
+                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-400 uppercase">
                             Faction
                           </th>
                           <SortHeader col="wins" label="Wins" />
                           <SortHeader col="winPct" label="Win %" />
-                          <th className="px-3 sm:px-4 py-2 text-left text-xs font-semibold text-gray-400 uppercase">
+                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-400 uppercase">
                             Avg Survivors
                           </th>
-                          <SortHeader col="damage" label="Avg Dmg" />
                         </tr>
                       </thead>
                       <tbody>
                         {sortedRows.map((row, i) => {
-                          const survivorParts = (
-                            ['interceptor', 'cruiser', 'dreadnought', 'starbase'] as ShipType[]
-                          )
+                          const survivorParts = SHIP_TYPES
                             .filter(t => row.avgSurvivors[t] > 0)
-                            .map(t => `${row.avgSurvivors[t].toFixed(1)} ${SHIP_LABELS[t]}`);
+                            .map(t => `${row.avgSurvivors[t].toFixed(1)} ${SHIP_TYPE_LABELS[t].abbreviated}`);
                           return (
                             <tr
                               key={row.id}
-                              className={i % 2 === 0 ? 'bg-gray-800' : 'bg-gray-750'}
+                              className={i % 2 === 0 ? 'bg-gray-800' : 'bg-gray-800/50'}
                             >
-                              <td className="px-3 sm:px-4 py-2.5 text-white font-medium">
-                                {getFactionDisplayName(row.id, allFactions)}
+                              <td className="px-4 py-2.5 text-white font-medium">
+                                <span className="flex items-center gap-2">
+                                  <span className="inline-block w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: colorMap[row.id] }} />
+                                  {nameMap[row.id] ?? row.id}
+                                </span>
                               </td>
-                              <td className="px-3 sm:px-4 py-2.5 text-gray-300">{row.wins}</td>
-                              <td className="px-3 sm:px-4 py-2.5 text-gray-300">
+                              <td className="px-4 py-2.5 text-gray-300">{row.wins}</td>
+                              <td className="px-4 py-2.5 text-gray-300">
                                 {row.winPct.toFixed(1)}%
                               </td>
-                              <td className="px-3 sm:px-4 py-2.5 text-gray-300 text-xs">
+                              <td className="px-4 py-2.5 text-gray-300 text-xs">
                                 {survivorParts.length > 0 ? survivorParts.join(', ') : '—'}
-                              </td>
-                              <td className="px-3 sm:px-4 py-2.5 text-gray-300">
-                                {row.avgDmg.toFixed(1)}
                               </td>
                             </tr>
                           );
@@ -268,7 +315,7 @@ export function ResultsSection({ setup }: ResultsSectionProps) {
                 </div>
 
                 {/* Simulation log */}
-                <SimulationLog runs={results.runs} factions={allFactions} />
+                <SimulationLog runs={results.runs} nameMap={nameMap} colorMap={colorMap} />
               </>
             )}
           </>
@@ -276,13 +323,13 @@ export function ResultsSection({ setup }: ResultsSectionProps) {
 
         {/* Re-run button */}
         {setup && (
-          <div className="flex gap-3">
+          <div>
             <button
               onClick={runSim}
               disabled={running}
-              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors text-sm"
+              className="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors text-sm"
             >
-              Re-run
+              ▶ Re-run Simulation
             </button>
           </div>
         )}

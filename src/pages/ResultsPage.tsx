@@ -6,8 +6,8 @@ import type {
   SimulationConfig,
   SimulationResults,
 } from '../types/game';
-import { SHIP_TYPES, SHIP_TYPE_LABELS } from '../data/constants';
-import { ResultsChart, PALETTE } from '../components/ResultsChart';
+import { SHIP_TYPES, SHIP_TYPE_LABELS, FACTION_COLORS } from '../data/constants';
+import { ResultsChart } from '../components/ResultsChart';
 import { SimulationLog } from '../components/SimulationLog';
 
 export interface BattleSetupData {
@@ -24,24 +24,9 @@ function buildNameMap(
 ): Record<string, string> {
   const map: Record<string, string> = {};
 
-  // Count how many times each faction appears to disambiguate duplicates
-  const factionCounts = new Map<string, number>();
-  for (const dep of deployments) {
-    factionCounts.set(dep.factionId, (factionCounts.get(dep.factionId) ?? 0) + 1);
-  }
-
-  const factionIndex = new Map<string, number>();
   for (const dep of deployments) {
     const faction = factions.find(f => f.id === dep.factionId);
-    const baseName = faction?.name ?? dep.factionId;
-    const count = factionCounts.get(dep.factionId) ?? 1;
-    if (count > 1) {
-      const idx = (factionIndex.get(dep.factionId) ?? 0) + 1;
-      factionIndex.set(dep.factionId, idx);
-      map[dep.id] = `${baseName} #${idx}`;
-    } else {
-      map[dep.id] = baseName;
-    }
+    map[dep.id] = faction?.name ?? dep.factionId;
   }
 
   // NPC names
@@ -146,10 +131,20 @@ export function ResultsSection({ setup }: ResultsSectionProps) {
     ? results.summary.map(s => s.factionId)
     : [];
 
-  // Build color map: factionId → chart color, matching the order in results.summary
+  // Build color map: deployment ID → chart color from faction's stored color
   const colorMap: Record<string, string> = {};
-  for (let i = 0; i < allIds.length; i++) {
-    colorMap[allIds[i]] = PALETTE[i % PALETTE.length];
+  if (setup) {
+    for (const dep of setup.factionDeployments) {
+      const faction = setup.factions.find(f => f.id === dep.factionId);
+      if (faction) colorMap[dep.id] = faction.color;
+    }
+    // NPC colors from palette
+    let npcColorIdx = 0;
+    for (let i = 0; i < setup.npcDeployments.length; i++) {
+      const npcId = `npc-${setup.npcDeployments[i].type}-${i}`;
+      colorMap[npcId] = FACTION_COLORS[(setup.factionDeployments.length + npcColorIdx) % FACTION_COLORS.length];
+      npcColorIdx++;
+    }
   }
 
   const tableRows = allIds.map(id => {
@@ -240,7 +235,7 @@ export function ResultsSection({ setup }: ResultsSectionProps) {
             ) : (
               <>
                 {/* Win probability chart */}
-                <ResultsChart results={results} nameMap={nameMap} />
+                <ResultsChart results={results} nameMap={nameMap} colorMap={colorMap} />
 
                 {/* Statistics — card layout on mobile */}
                 <div className="sm:hidden space-y-3">

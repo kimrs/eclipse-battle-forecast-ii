@@ -62,6 +62,7 @@ export interface Blueprint {
 export interface Faction {
   id: string;
   name: string;
+  color: string;
   blueprints: Record<ShipType, Blueprint>;
   hasAntimatterSplitter?: boolean;
 }
@@ -71,7 +72,7 @@ export interface Faction {
 export type NpcType = 'ancient' | 'guardian' | 'gcds';
 
 export interface FactionDeployment {
-  id: string;                // unique instance ID (allows duplicate factions)
+  id: string;                // unique instance ID
   factionId: string;
   ships: { type: ShipType; count: number }[];
   turnOfEntry: number;       // lower = entered earlier

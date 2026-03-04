@@ -5,6 +5,7 @@ import type { SimulationResults } from '../types/game';
 interface ResultsChartProps {
   results: SimulationResults;
   nameMap: Record<string, string>;
+  colorMap?: Record<string, string>;
 }
 
 export const PALETTE = ['#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
@@ -16,13 +17,13 @@ interface ChartEntry {
   color: string;
 }
 
-function buildChartData(results: SimulationResults, nameMap: Record<string, string>): ChartEntry[] {
+function buildChartData(results: SimulationResults, nameMap: Record<string, string>, colorMap?: Record<string, string>): ChartEntry[] {
   const totalWins = results.summary.reduce((sum, s) => sum + s.wins, 0);
   return results.summary.map((s, i) => ({
     label: nameMap[s.factionId] ?? s.factionId,
     wins: s.wins,
     pct: totalWins > 0 ? s.wins / totalWins : 0,
-    color: PALETTE[i % PALETTE.length],
+    color: colorMap?.[s.factionId] ?? PALETTE[i % PALETTE.length],
   }));
 }
 
@@ -160,11 +161,11 @@ function drawPieChart(
     .attr('opacity', 1);
 }
 
-export function ResultsChart({ results, nameMap }: ResultsChartProps) {
+export function ResultsChart({ results, nameMap, colorMap }: ResultsChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const totalRuns = results.config.runs;
-  const chartData = useMemo(() => buildChartData(results, nameMap), [results, nameMap]);
+  const chartData = useMemo(() => buildChartData(results, nameMap, colorMap), [results, nameMap, colorMap]);
 
   useEffect(() => {
     const svg = svgRef.current;

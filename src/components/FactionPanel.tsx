@@ -26,6 +26,12 @@ export function FactionPanel({ deployment, availableFactions, onChange, onRemove
     <div className="bg-gray-800 border border-gray-600 rounded-xl shadow p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
+          {(() => {
+            const faction = availableFactions.find(f => f.id === deployment.factionId);
+            return faction ? (
+              <span className="inline-block w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: faction.color }} />
+            ) : null;
+          })()}
           <label className="text-sm text-gray-400">Faction:</label>
           <select
             value={deployment.factionId}

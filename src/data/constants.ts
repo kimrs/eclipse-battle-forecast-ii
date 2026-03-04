@@ -25,6 +25,8 @@ export const DIE_COLOR_CLASSES: Record<DieColor, string> = {
   pink: 'bg-pink-400 text-pink-900',
 };
 
+export const FACTION_COLORS = ['#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
+
 export const PART_BY_ID: Record<string, ShipPart> = Object.fromEntries(
   SHIP_PARTS.map(p => [p.id, p])
 );

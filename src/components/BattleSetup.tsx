@@ -124,25 +124,35 @@ export function BattleSetup({
           </button>
           {dropdownOpen && (
             <div className="absolute left-0 sm:left-1/2 sm:-translate-x-1/2 top-full mt-1 z-10 bg-gray-800 border border-gray-600 rounded-xl shadow-xl w-full sm:w-auto min-w-[16rem] py-2">
-              {availableFactions.length > 0 ? (
-                <>
-                  <p className="px-3 py-1 text-xs text-gray-500 uppercase tracking-wider">
-                    Factions
-                  </p>
-                  {availableFactions.map(f => (
-                    <button
-                      key={f.id}
-                      onClick={() => handleAddFaction(f)}
-                      className="w-full text-left px-4 py-3 text-sm text-gray-200 hover:bg-gray-700 transition-colors"
-                    >
-                      {f.name}
-                    </button>
-                  ))}
-                  <div className="border-t border-gray-700 my-1" />
-                </>
-              ) : (
-                <p className="px-4 py-3 text-xs text-gray-500 italic">No factions configured</p>
-              )}
+              {(() => {
+                const deployedFactionIds = new Set(factionDeployments.map(d => d.factionId));
+                const undeployedFactions = availableFactions.filter(f => !deployedFactionIds.has(f.id));
+                return undeployedFactions.length > 0 ? (
+                  <>
+                    <p className="px-3 py-1 text-xs text-gray-500 uppercase tracking-wider">
+                      Factions
+                    </p>
+                    {undeployedFactions.map(f => (
+                      <button
+                        key={f.id}
+                        onClick={() => handleAddFaction(f)}
+                        className="w-full text-left px-4 py-3 text-sm text-gray-200 hover:bg-gray-700 transition-colors flex items-center gap-2"
+                      >
+                        <span className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: f.color }} />
+                        {f.name}
+                      </button>
+                    ))}
+                    <div className="border-t border-gray-700 my-1" />
+                  </>
+                ) : availableFactions.length > 0 ? (
+                  <>
+                    <p className="px-4 py-3 text-xs text-gray-500 italic">All factions already deployed</p>
+                    <div className="border-t border-gray-700 my-1" />
+                  </>
+                ) : (
+                  <p className="px-4 py-3 text-xs text-gray-500 italic">No factions configured</p>
+                );
+              })()}
               <p className="px-3 py-1 text-xs text-gray-500 uppercase tracking-wider">NPCs</p>
               {NPC_OPTIONS.map(opt => (
                 <button

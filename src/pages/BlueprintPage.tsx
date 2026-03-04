@@ -3,7 +3,7 @@ import { BlueprintEditor } from '../components/BlueprintEditor';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { SPECIES_PRESETS } from '../data/species';
 import type { BlueprintPreset } from '../data/species';
-import { SHIP_TYPES, SHIP_TYPE_LABELS, PART_BY_ID } from '../data/constants';
+import { SHIP_TYPES, SHIP_TYPE_LABELS, PART_BY_ID, FACTION_COLORS } from '../data/constants';
 import type { Faction, ShipType, Blueprint } from '../types/game';
 
 function buildBlueprintFromPreset(shipType: ShipType, cfg: BlueprintPreset): Blueprint {
@@ -21,9 +21,10 @@ function buildBlueprintFromPreset(shipType: ShipType, cfg: BlueprintPreset): Blu
 }
 
 export function makeDefaultFactions(): Faction[] {
-  return SPECIES_PRESETS.map(preset => ({
+  return SPECIES_PRESETS.map((preset, i) => ({
     id: crypto.randomUUID(),
     name: preset.name,
+    color: FACTION_COLORS[i % FACTION_COLORS.length],
     blueprints: Object.fromEntries(
       SHIP_TYPES.map(st => [st, buildBlueprintFromPreset(st, preset.blueprints[st])]),
     ) as Faction['blueprints'],
@@ -37,14 +38,22 @@ const DEFAULT_SHIP_PROPS: Record<ShipType, { slots: number; initiativeBonus: num
   starbase: { slots: 5, initiativeBonus: 4 },
 };
 
-function makeEmptyFaction(name: string): Faction {
+function makeEmptyFaction(name: string, color: string): Faction {
   return {
     id: crypto.randomUUID(),
     name,
+    color,
     blueprints: Object.fromEntries(
       SHIP_TYPES.map(st => [st, { shipType: st, ...DEFAULT_SHIP_PROPS[st], parts: [] } as Blueprint]),
     ) as Faction['blueprints'],
   };
+}
+
+function getRandomColor(factions: Faction[]): string {
+  const usedColors = new Set(factions.map(f => f.color));
+  const available = FACTION_COLORS.filter(c => !usedColors.has(c));
+  if (available.length > 0) return available[Math.floor(Math.random() * available.length)];
+  return FACTION_COLORS[Math.floor(Math.random() * FACTION_COLORS.length)];
 }
 
 
@@ -86,11 +95,22 @@ export function BlueprintSection({ factions, onFactionsChange }: BlueprintSectio
 
   const handleAddFaction = () => {
     if (!newFactionName.trim()) return;
-    const faction = makeEmptyFaction(newFactionName.trim());
+    const faction = makeEmptyFaction(newFactionName.trim(), getRandomColor(factions));
     onFactionsChange([...factions, faction]);
     setActiveFactionId(faction.id);
     setNewFactionName('');
     setShowNewFactionInput(false);
+  };
+
+  const handleDuplicateFaction = () => {
+    if (!activeFaction) return;
+    const clone: Faction = JSON.parse(JSON.stringify(activeFaction));
+    clone.id = crypto.randomUUID();
+    clone.name = `${activeFaction.name} (copy)`;
+    clone.color = getRandomColor(factions);
+    const updated = [...factions, clone];
+    onFactionsChange(updated);
+    setActiveFactionId(clone.id);
   };
 
   const handleDeleteFaction = (id: string) => {
@@ -155,17 +175,18 @@ export function BlueprintSection({ factions, onFactionsChange }: BlueprintSectio
         {/* Faction Tabs */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-4">
           <div className="relative">
-            <div className="overflow-x-auto flex flex-nowrap gap-2 snap-x snap-mandatory scrollbar-hide pb-1 [mask-image:linear-gradient(to_right,transparent,black_1rem,black_calc(100%-1rem),transparent)] sm:[mask-image:none]">
+            <div className="overflow-x-auto flex flex-nowrap gap-2 snap-x snap-mandatory scrollbar-hide pb-1 max-w-[70vw] sm:max-w-[60vw] [mask-image:linear-gradient(to_right,transparent,black_1rem,black_calc(100%-1rem),transparent)]">
               {factions.map(faction => (
                 <button
                   key={faction.id}
                   onClick={() => setActiveFactionId(faction.id)}
-                  className={`snap-start shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`snap-start shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
                     faction.id === activeFactionId
                       ? 'bg-blue-600 text-white'
                       : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                   }`}
                 >
+                  <span className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: faction.color }} />
                   {faction.name}
                 </button>
               ))}
@@ -229,7 +250,23 @@ export function BlueprintSection({ factions, onFactionsChange }: BlueprintSectio
                 <button onClick={() => setRenamingId(null)} className="text-sm text-gray-400 hover:text-gray-300 px-1">Cancel</button>
               </div>
             ) : (
-              <span className="font-semibold text-white">{activeFaction.name}</span>
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: activeFaction.color }} />
+                <span className="font-semibold text-white">{activeFaction.name}</span>
+                <div className="flex gap-1">
+                  {FACTION_COLORS.map(c => (
+                    <button
+                      key={c}
+                      onClick={() => updateFaction({ ...activeFaction, color: c })}
+                      className={`w-5 h-5 rounded-full border-2 transition-transform ${
+                        activeFaction.color === c ? 'border-white scale-110' : 'border-gray-600 hover:border-gray-400'
+                      }`}
+                      style={{ backgroundColor: c }}
+                      title={`Set color to ${c}`}
+                    />
+                  ))}
+                </div>
+              </div>
             )}
 
             <button
@@ -245,6 +282,13 @@ export function BlueprintSection({ factions, onFactionsChange }: BlueprintSectio
               className="text-xs text-red-400 hover:text-red-300 border border-red-800 rounded px-2 py-0.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Delete
+            </button>
+
+            <button
+              onClick={handleDuplicateFaction}
+              className="text-xs text-gray-300 hover:text-white border border-gray-600 rounded px-2 py-0.5 transition-colors"
+            >
+              Duplicate
             </button>
 
             <div className="relative ml-auto" ref={presetDropdownRef}>

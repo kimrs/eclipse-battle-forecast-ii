@@ -196,6 +196,7 @@ describe('simulateSectorBattle', () => {
     return {
       id,
       name: id,
+      color: '#000000',
       blueprints: {
         interceptor: cannonBp,
         cruiser: makeBlueprint({ shipType: 'cruiser' }),
@@ -236,9 +237,9 @@ describe('simulateSectorBattle', () => {
     const cBp = makeBlueprint({ initiativeBonus: 0, parts: [hullOnePart] }); // hull=1 so survives one hit
 
     const factions: Record<string, Faction> = {
-      A: { id: 'A', name: 'A', blueprints: { interceptor: aBp, cruiser: makeBlueprint({ shipType: 'cruiser' }), dreadnought: makeBlueprint({ shipType: 'dreadnought' }), starbase: makeBlueprint({ shipType: 'starbase' }) } },
-      B: { id: 'B', name: 'B', blueprints: { interceptor: bBp, cruiser: makeBlueprint({ shipType: 'cruiser' }), dreadnought: makeBlueprint({ shipType: 'dreadnought' }), starbase: makeBlueprint({ shipType: 'starbase' }) } },
-      C: { id: 'C', name: 'C', blueprints: { interceptor: cBp, cruiser: makeBlueprint({ shipType: 'cruiser' }), dreadnought: makeBlueprint({ shipType: 'dreadnought' }), starbase: makeBlueprint({ shipType: 'starbase' }) } },
+      A: { id: 'A', name: 'A', color: '#000000', blueprints: { interceptor: aBp, cruiser: makeBlueprint({ shipType: 'cruiser' }), dreadnought: makeBlueprint({ shipType: 'dreadnought' }), starbase: makeBlueprint({ shipType: 'starbase' }) } },
+      B: { id: 'B', name: 'B', color: '#000000', blueprints: { interceptor: bBp, cruiser: makeBlueprint({ shipType: 'cruiser' }), dreadnought: makeBlueprint({ shipType: 'dreadnought' }), starbase: makeBlueprint({ shipType: 'starbase' }) } },
+      C: { id: 'C', name: 'C', color: '#000000', blueprints: { interceptor: cBp, cruiser: makeBlueprint({ shipType: 'cruiser' }), dreadnought: makeBlueprint({ shipType: 'dreadnought' }), starbase: makeBlueprint({ shipType: 'starbase' }) } },
     };
 
     const setup: SectorSetup = {
@@ -262,8 +263,8 @@ describe('simulateSectorBattle', () => {
   it('sector controller is always last player to fight', () => {
     // Even if controller has high turnOfEntry, they should fight last
     const factions: Record<string, Faction> = {
-      A: { id: 'A', name: 'A', blueprints: { interceptor: cannonBp, cruiser: makeBlueprint({ shipType: 'cruiser' }), dreadnought: makeBlueprint({ shipType: 'dreadnought' }), starbase: makeBlueprint({ shipType: 'starbase' }) } },
-      B: { id: 'B', name: 'B', blueprints: { interceptor: cannonBp, cruiser: makeBlueprint({ shipType: 'cruiser' }), dreadnought: makeBlueprint({ shipType: 'dreadnought' }), starbase: makeBlueprint({ shipType: 'starbase' }) } },
+      A: { id: 'A', name: 'A', color: '#000000', blueprints: { interceptor: cannonBp, cruiser: makeBlueprint({ shipType: 'cruiser' }), dreadnought: makeBlueprint({ shipType: 'dreadnought' }), starbase: makeBlueprint({ shipType: 'starbase' }) } },
+      B: { id: 'B', name: 'B', color: '#000000', blueprints: { interceptor: cannonBp, cruiser: makeBlueprint({ shipType: 'cruiser' }), dreadnought: makeBlueprint({ shipType: 'dreadnought' }), starbase: makeBlueprint({ shipType: 'starbase' }) } },
     };
     const setup: SectorSetup = {
       factions: [
@@ -287,7 +288,7 @@ describe('runSimulations', () => {
   const cannonBp = makeBlueprint({ parts: [YELLOW_CANNON_PART] });
   function makeFaction(id: string): Faction {
     return {
-      id, name: id,
+      id, name: id, color: '#000000',
       blueprints: {
         interceptor: cannonBp,
         cruiser: makeBlueprint({ shipType: 'cruiser' }),

@@ -16,6 +16,7 @@ function makeFaction(id: string, name: string, interceptorPartIds: string[], cru
   return {
     id,
     name,
+    color: '#000000',
     blueprints: {
       interceptor: {
         shipType: 'interceptor',
